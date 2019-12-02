@@ -769,6 +769,15 @@ class HAPSocket:
     @_with_out_lock
     def sendall(self, data, flags=0):
         """Encrypt and send the given data."""
+
+        # block for up to 0.2 to make sure
+        # the socket is ready for writing to
+        # prevent connection reset by peer
+        ready_to_read, ready_to_write, in_error = select.select([],[self.socket],[self.socket],0.2)
+        if in_error:
+            logger.error("sendall found socket in error state");
+            raise
+
         assert not flags
         result = b""
         offset = 0
