@@ -231,6 +231,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
             getattr(self, self.HANDLERS[self.command][path])()
         except NotAllowedInStateException:
             self.send_response(403)
+            self.end_response(b'')
         except UnprivilegedRequestException:
             response = {"status": HAP_SERVER_STATUS.INSUFFICIENT_PRIVILEGES}
             data = json.dumps(response).encode("utf-8")
@@ -391,6 +392,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
         if not should_confirm:
             self.send_response(500)
+            self.end_response(b'')
             return
 
         tlv_data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b'\x06',
@@ -551,6 +553,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.exception('Exception in set_characteristics: %s', e)
             self.send_response(HTTPStatus.BAD_REQUEST)
+            self.end_response(b'')
         else:
             self.send_response(HTTPStatus.NO_CONTENT)
             self.end_response(b'')
@@ -580,6 +583,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
             client_uuid, client_public)
         if not should_confirm:
             self.send_response(500)
+            self.end_response(b'')
             return
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b"\x02")
