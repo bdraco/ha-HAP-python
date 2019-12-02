@@ -816,9 +816,18 @@ class HAPServer(socketserver.ThreadingMixIn,
     def _close_socket(self, sock):
         """Shutdown and close the given socket."""
         try:
-            sock.shutdown(socket.SHUT_RDWR)
+            sock.shutdown(socket.SHUT_WR)
         except socket.error:
-            logger.info("Error shutting down socket: %s", str(socket.error))
+            logger.info("Error shutting down socket for write: %s", str(socket.error))
+            pass
+        try:
+            sock.shutdown(socket.SHUT_RD)
+            # Now drain the buffer to avoid
+            # a connection reset by peer error
+            while sock.recv(65535):
+              continue
+        except socket.error:
+            logger.info("Error shutting down socket for read: %s", str(socket.error))
             pass
         sock.close()
 
