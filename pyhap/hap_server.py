@@ -192,8 +192,9 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def end_response(self, bytesdata, close_connection=False):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
-        if close_connection:
-            self.send_header("Connection", "close")
+        close_connection = True
+        #if close_connection:
+        #    self.send_header("Connection", "close")
         logger.debug("Response: %s", b"".join(self._headers_buffer))
         self.end_headers()
         self.wfile.write(bytesdata)
@@ -515,7 +516,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def handle_set_characteristics(self):
         """Handles a client request to update certain characteristics."""
         if not self.is_encrypted:
-            logger.warning('Attemp to access unauthorised content from %s',
+            logger.warning('Attempt to access unauthorised content from %s',
                            self.client_address)
             self.send_response(HTTPStatus.UNAUTHORIZED)
             self.end_response(b'', close_connection=True)
