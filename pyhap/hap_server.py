@@ -756,7 +756,7 @@ class HAPSocket:
         result = b""
         offset = 0
         total = len(data)
-        logger.debug("sendall: %s", str(data))
+        logger.debug("sendall: %s", bytes(data))
         while offset < total:
             length = min(total - offset, self.MAX_BLOCK_LENGTH)
             length_bytes = struct.pack("H", length)
@@ -817,8 +817,8 @@ class HAPServer(socketserver.ThreadingMixIn,
         """Shutdown and close the given socket."""
         try:
             sock.shutdown(socket.SHUT_WR)
-        except socket.error:
-            logger.info("Error shutting down socket for write: %s", str(socket.error))
+        except socket.error, e:
+            logger.info("Error shutting down socket for write: %s", str(e))
             pass
         try:
             sock.shutdown(socket.SHUT_RD)
@@ -826,8 +826,8 @@ class HAPServer(socketserver.ThreadingMixIn,
             # a connection reset by peer error
             while sock.recv(65535):
               continue
-        except socket.error:
-            logger.info("Error shutting down socket for read: %s", str(socket.error))
+        except socket.error, e:
+            logger.info("Error shutting down socket for read: %s", str(e))
             pass
         sock.close()
 
