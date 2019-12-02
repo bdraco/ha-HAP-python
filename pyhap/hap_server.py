@@ -956,6 +956,7 @@ class HAPServer(socketserver.ThreadingMixIn,
             logger.debug('No socket for %s', client_addr)
             return False
         data = self.create_hap_event(bytesdata)
+        logger.debug("SEND EVENT: %s", data)
         try:
             client_socket.sendall(data)
             return True
