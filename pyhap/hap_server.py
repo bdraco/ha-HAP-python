@@ -777,9 +777,14 @@ class HAPSocket:
         # with a connection reset by peer error if we start
         # writing in this thread
         # 
-        # We block for up to 0.2 to make sure
+        # We block for up to 1s to make sure
         # the socket is ready for writing to
         # prevent connection reset by peer
+        #
+        # In the future it may be make push_event
+        # tell the thread that is handling the connection
+        # to send the event at the next available time
+        # to avoid blocking
         ready_to_read, ready_to_write, in_error = select.select([], [self.socket], [self.socket], 1)
         if in_error:
             logger.error("sendall found socket in error state");
