@@ -190,6 +190,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def end_response(self, bytesdata, close_connection=False):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
+        self.send_header("Connection", "close") if close_connection
         self.end_headers()
         self.wfile.write(bytesdata)
         self.close_connection = 1 if close_connection else 0
@@ -203,8 +204,12 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         try:
             getattr(self, self.HANDLERS[self.command][path])()
         except NotAllowedInStateException:
+            logger.debug("403: Request %s from address '%s' for path '%s'.",
+                     self.command, self.client_address, self.path)
             self.send_response(403)
         except UnprivilegedRequestException:
+            logger.debug("UnprivilegedRequestException: Request %s from address '%s' for path '%s'.",
+                     self.command, self.client_address, self.path)
             response = {"status": HAP_SERVER_STATUS.INSUFFICIENT_PRIVILEGES}
             data = json.dumps(response).encode("utf-8")
             self.send_response(401)
