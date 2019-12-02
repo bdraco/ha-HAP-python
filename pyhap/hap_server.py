@@ -191,6 +191,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
         self.send_header("Connection", "close") if close_connection
+        logger.debug("Response: %s", "".join(self._headers_buffer))
         self.end_headers()
         self.wfile.write(bytesdata)
         self.close_connection = 1 if close_connection else 0
