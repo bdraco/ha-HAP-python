@@ -24,6 +24,7 @@ import ed25519
 
 import pyhap.tlv as tlv
 from pyhap.util import long_to_bytes
+from pyhap.const import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.state = self.accessory_handler.state
         self.enc_context = None
         self.is_encrypted = False
-        self.server_version = 'pyhap'
+        self.server_version = 'pyhap/' + __version__
         self.protocol_version = 'HTTP/1.1'
         # Redirect separate handlers to the dispatch method
         self.do_GET = self.do_POST = self.do_PUT = self.dispatch
