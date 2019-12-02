@@ -192,7 +192,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(bytesdata))
         if close_connection:
             self.send_header("Connection", "close")
-        logger.debug("Response: %s", "".join(self._headers_buffer))
+        logger.debug("Response: %s", b"".join(self._headers_buffer))
         self.end_headers()
         self.wfile.write(bytesdata)
         self.close_connection = 1 if close_connection else 0
