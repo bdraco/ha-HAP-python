@@ -198,7 +198,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         # content in a single write to avoid homekit
         # on the client side stalling and making
         # devices appear non-responsive.
-        # 
+        #
         # The below code does what end_headers does internally
         # except it combines the headers and the content
         # into a single write instead of two calls to
