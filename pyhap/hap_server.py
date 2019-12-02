@@ -137,6 +137,8 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.state = self.accessory_handler.state
         self.enc_context = None
         self.is_encrypted = False
+        self.server_version = 'pyhap'
+        self.protocol_version = 'HTTP/1.1'
         # Redirect separate handlers to the dispatch method
         self.do_GET = self.do_POST = self.do_PUT = self.dispatch
 

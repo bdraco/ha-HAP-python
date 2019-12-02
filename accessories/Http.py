@@ -34,8 +34,6 @@ class HttpBridgeHandler(BaseHTTPRequestHandler):
         }
     }
     """
-    server_version = 'pyhap'
-    protocol_version = 'HTTP/1.1'
 
     def __init__(self, http_accessory, sock, client_addr, server):
         """Create a handler that passes updates to the given HttpAccessory.
