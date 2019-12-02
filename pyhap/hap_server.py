@@ -139,6 +139,11 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.enc_context = None
         self.is_encrypted = False
         self.server_version = 'pyhap/' + __version__
+        # HTTP/1.1 allows a keep-alive which makes
+        # a large accessory list usable in homekit
+        # If iOS has to reconnect to query each accessory
+        # it can be painfully slow and lead to lock up on the
+        # client side as well as non-responsive devices
         self.protocol_version = 'HTTP/1.1'
         # Redirect separate handlers to the dispatch method
         self.do_GET = self.do_POST = self.do_PUT = self.dispatch
