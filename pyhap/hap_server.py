@@ -199,8 +199,8 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
     def dispatch(self):
         """Dispatch the request to the appropriate handler method."""
-        logger.debug("Request %s from address '%s' for path '%s'.",
-                     self.command, self.client_address, self.path)
+        logger.debug("Request %s from address '%s' for path '%s' headers '%s'.",
+                     self.command, self.client_address, self.path, str(self.headers))
         path = urlparse(self.path).path
         assert path in self.HANDLERS[self.command]
         try:
