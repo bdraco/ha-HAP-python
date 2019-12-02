@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class HttpBridgeHandler(BaseHTTPRequestHandler):
-    server_version = "pyhap/" + __version__
-    protocol_version = "HTTP/1.1"
     """Handles requests and passes value updates to an HttpAccessory.
 
     The POST request should contain json data with the format:
@@ -36,6 +34,8 @@ class HttpBridgeHandler(BaseHTTPRequestHandler):
         }
     }
     """
+    server_version = 'pyhap'
+    protocol_version = 'HTTP/1.1'
 
     def __init__(self, http_accessory, sock, client_addr, server):
         """Create a handler that passes updates to the given HttpAccessory.
