@@ -217,7 +217,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         #
         self._headers_buffer.append(b"\r\n")
         logger.debug("Sender headers: %s", b"".join(self._headers_buffer))
-        self.wfile.write(b"".join(self._headers_buffer) + bytesdata)
+        self.socket.sendall(b"".join(self._headers_buffer) + bytesdata)
         self._headers_buffer = []
 
     def dispatch(self):
