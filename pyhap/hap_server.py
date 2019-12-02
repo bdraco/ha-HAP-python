@@ -934,7 +934,7 @@ class HAPServer(socketserver.ThreadingMixIn,
         data = self.create_hap_event(bytesdata)
         logger.debug("SEND EVENT: %s", data)
         try:
-            #client_socket.sendall(data)
+            client_socket.sendall(data)
             return True
         except (OSError, socket.timeout) as e:
             logger.debug('exception %s for %s in push_event()', e, client_addr)
