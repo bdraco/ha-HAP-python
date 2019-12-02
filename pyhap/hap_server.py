@@ -787,8 +787,13 @@ class HAPSocket:
         # to avoid blocking
         ready_to_read, ready_to_write, in_error = select.select([], [self.socket], [self.socket], 1)
         if in_error:
-            logger.error("sendall found socket in error state");
+            logger.error("sendall found socket in error state")
             raise
+
+        if not ready_to_write:
+            logger.error("sendall found socket not ready to write")
+            raise
+
 
         assert not flags
         result = b""
