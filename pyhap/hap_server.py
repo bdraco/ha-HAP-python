@@ -738,6 +738,7 @@ class HAPSocket:
                     self.curr_in_block = None
                     break
 
+        logger.debug("recv: %s", result)
         return result
 
     @_with_out_lock
@@ -765,6 +766,7 @@ class HAPSocket:
             offset += length
             self.out_count += 1
             result += ciphertext
+        logger.debug("sendall: %s", result)
         self.socket.sendall(result)
         return total
 
