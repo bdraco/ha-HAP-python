@@ -523,6 +523,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         chars = self.accessory_handler.get_characteristics(params["id"][0].split(","))
 
         data = json.dumps(chars).encode("utf-8")
+        logger.debug("handle_get_characteristics: %s", data)
         self.send_response(207)
         self.send_header("Content-Type", self.JSON_RESPONSE_TYPE)
         self.end_response(data)
