@@ -829,8 +829,10 @@ class HAPServer(socketserver.ThreadingMixIn,
             pass
         try:
             sock.shutdown(socket.SHUT_RD)
-            # Now drain the buffer to avoid
-            # a connection reset by peer error
+            # Since the http client is allowed to
+            # disconnect at any point, we need to
+            # consume any of the data still on the wire
+            # to avoid a connection reset by peer error
             while sock.recv(65535):
               continue
         except socket.error:
