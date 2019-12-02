@@ -931,6 +931,14 @@ class HAPServer(socketserver.ThreadingMixIn,
             return False
         data = self.create_hap_event(bytesdata)
         try:
+            # block for up to 0.2 to make sure
+            # the socket is ready for writing to
+            # prevent connection reset by peer
+            ready_to_read, ready_to_write, in_error = select.select(
+                  [],
+                  [client_socket],
+                  [client_socket],
+                  0.2)
             client_socket.sendall(data)
             return True
         except (OSError, socket.timeout) as e:
