@@ -198,6 +198,8 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def end_response(self, bytesdata, close_connection=False):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
+        # Setting this head will take care of setting
+        # self.close_connection to the right value
         self.send_header("Connection", ("close" if close_connection else "keep-alive"))
         # Important: we need to send the headers and the
         # content in a single write to avoid homekit
@@ -215,7 +217,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self._headers_buffer.append(b"\r\n")
         self.wfile.write(b"".join(self._headers_buffer) + bytesdata)
         self._headers_buffer = []
-        self.close_connection = 1 if close_connection else 0
 
     def dispatch(self):
         """Dispatch the request to the appropriate handler method."""
