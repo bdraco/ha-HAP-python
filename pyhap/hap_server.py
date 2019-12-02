@@ -756,6 +756,7 @@ class HAPSocket:
         result = b""
         offset = 0
         total = len(data)
+        logger.debug("sendall: %s", data)
         while offset < total:
             length = min(total - offset, self.MAX_BLOCK_LENGTH)
             length_bytes = struct.pack("H", length)
@@ -766,7 +767,6 @@ class HAPSocket:
             offset += length
             self.out_count += 1
             result += ciphertext
-        logger.debug("sendall: %s", result)
         self.socket.sendall(result)
         return total
 
