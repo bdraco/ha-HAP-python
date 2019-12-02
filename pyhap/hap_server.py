@@ -771,29 +771,12 @@ class HAPSocket:
     def sendall(self, data, flags=0):
         """Encrypt and send the given data."""
 
-        # Now that have the out_lock, another
-        # thread could still be in the recv loop
-        # which would cause the connection to be dropped
-        # with a connection reset by peer error if we start
-        # writing in this thread
-        # 
-        # We block for up to 1s to make sure
-        # the socket is ready for writing to
-        # prevent connection reset by peer
+        # Warning: push_event has a race condition
         #
-        # In the future it may be make push_event
+        # In the future it may be better make push_event
         # tell the thread that is handling the connection
         # to send the event at the next available time
-        # to avoid blocking
-        ready_to_read, ready_to_write, in_error = select.select([], [self.socket], [self.socket], 1)
-        if in_error:
-            logger.error("sendall found socket in error state")
-            raise
-
-        if not ready_to_write:
-            logger.error("sendall found socket not ready to write")
-            raise
-
+        # so it never happens in the middle of a recv
 
         assert not flags
         result = b""
