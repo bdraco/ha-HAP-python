@@ -194,7 +194,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
         self.send_header("Connection", ("close" if close_connection else "keep-alive"))
-        logger.debug("Response: %s", b"".join(self._headers_buffer))
         self._headers_buffer.append(b"\r\n")
         self.wfile.write(b"".join(self._headers_buffer) + bytesdata)
         self._headers_buffer = []
@@ -202,19 +201,15 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
     def dispatch(self):
         """Dispatch the request to the appropriate handler method."""
-        logger.debug("Request %s from address '%s' for path '%s' headers '%s'.",
-                     self.command, self.client_address, self.path, str(self.headers))
+        logger.debug("Request %s from address '%s' for path '%s'.",
+                     self.command, self.client_address, self.path)
         path = urlparse(self.path).path
         assert path in self.HANDLERS[self.command]
         try:
             getattr(self, self.HANDLERS[self.command][path])()
         except NotAllowedInStateException:
-            logger.debug("403: Request %s from address '%s' for path '%s'.",
-                     self.command, self.client_address, self.path)
             self.send_response(403)
         except UnprivilegedRequestException:
-            logger.debug("UnprivilegedRequestException: Request %s from address '%s' for path '%s'.",
-                     self.command, self.client_address, self.path)
             response = {"status": HAP_SERVER_STATUS.INSUFFICIENT_PRIVILEGES}
             data = json.dumps(response).encode("utf-8")
             self.send_response(401)
@@ -516,7 +511,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def handle_set_characteristics(self):
         """Handles a client request to update certain characteristics."""
         if not self.is_encrypted:
-            logger.warning('Attempt to access unauthorised content from %s',
+            logger.warning('Attemp to access unauthorised content from %s',
                            self.client_address)
             self.send_response(HTTPStatus.UNAUTHORIZED)
             self.end_response(b'', close_connection=True)
