@@ -770,7 +770,13 @@ class HAPSocket:
     def sendall(self, data, flags=0):
         """Encrypt and send the given data."""
 
-        # block for up to 0.2 to make sure
+        # Now that have the out_lock, another
+        # thread could still be in the recv loop
+        # which would cause the connection to be dropped
+        # with a connection reset by peer error if we start
+        # writing in this thread
+        # 
+        # We block for up to 0.2 to make sure
         # the socket is ready for writing to
         # prevent connection reset by peer
         ready_to_read, ready_to_write, in_error = select.select([],[self.socket],[self.socket],0.2)
