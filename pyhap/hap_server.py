@@ -780,7 +780,7 @@ class HAPSocket:
         # We block for up to 0.2 to make sure
         # the socket is ready for writing to
         # prevent connection reset by peer
-        ready_to_read, ready_to_write, in_error = select.select([],[self.socket],[self.socket],0.2)
+        ready_to_read, ready_to_write, in_error = select.select([], [self.socket], [self.socket], 1)
         if in_error:
             logger.error("sendall found socket in error state");
             raise
