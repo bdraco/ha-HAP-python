@@ -867,7 +867,7 @@ class HAPServer(socketserver.ThreadingMixIn,
             self._handle_sock_timeout(client_address, e)
             logger.debug('Connection timeout')
         finally:
-            logger.debug('Cleaning connection to %s: close_connection: %d', client_address, self.close_connection)
+            logger.debug('Cleaning connection to %s: close_connection: %d', client_address)
             conn_sock = self.connections.pop(client_address, None)
             if conn_sock is not None:
                 self._close_socket(conn_sock)
