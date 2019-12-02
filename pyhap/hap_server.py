@@ -8,6 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from http import HTTPStatus
 import logging
 import socket
+import select
 import struct
 import json
 import errno
