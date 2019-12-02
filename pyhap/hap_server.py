@@ -739,7 +739,6 @@ class HAPSocket:
                     self.curr_in_block = None
                     break
 
-        logger.debug("recv: %s", result)
         return result
 
     @_with_out_lock
@@ -757,7 +756,6 @@ class HAPSocket:
         result = b""
         offset = 0
         total = len(data)
-        logger.debug("sendall: %s", bytes(data))
         while offset < total:
             length = min(total - offset, self.MAX_BLOCK_LENGTH)
             length_bytes = struct.pack("H", length)
