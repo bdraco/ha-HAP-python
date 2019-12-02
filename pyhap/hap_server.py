@@ -194,6 +194,19 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         """Combines adding a length header and actually sending the data."""
         self.send_header("Content-Length", len(bytesdata))
         self.send_header("Connection", ("close" if close_connection else "keep-alive"))
+        # Important: we need to send the headers and the
+        # content in a single write to avoid homekit
+        # on the client side stalling and making
+        # devices appear non-responsive.
+        # 
+        # The below code does what end_headers does internally
+        # except it combines the headers and the content
+        # into a single write instead of two calls to
+        # self.wfile.write
+        #
+        # TODO: Is there a better way that doesn't involve
+        # touching _headers_buffer ?
+        #
         self._headers_buffer.append(b"\r\n")
         self.wfile.write(b"".join(self._headers_buffer) + bytesdata)
         self._headers_buffer = []
