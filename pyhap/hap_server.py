@@ -816,6 +816,7 @@ class HAPServer(socketserver.ThreadingMixIn,
         try:
             sock.shutdown(socket.SHUT_RDWR)
         except socket.error:
+            logger.info("Error shutting down socket: %s", str(socket.error))
             pass
         sock.close()
 
