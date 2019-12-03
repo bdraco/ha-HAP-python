@@ -200,7 +200,7 @@ class Characteristic:
         if should_notify and self.broker:
             self.notify()
 
-    def client_update_value(self, value, client_addr):
+    def client_update_value(self, value, client_addr=None):
         """Called from broker for value change in Home app.
 
         Change self.value to value and call callback.
@@ -213,7 +213,7 @@ class Characteristic:
             # pylint: disable=not-callable
             self.setter_callback(value)
 
-    def notify(self, client_addr=''):
+    def notify(self, client_addr=None):
         """Notify clients about a value change. Sends the value.
 
         .. seealso:: accessory.publish

@@ -405,7 +405,7 @@ class AccessoryDriver:
                 if not subscribed_clients:
                     del self.topics[topic]
 
-    def publish(self, data, client_addr):
+    def publish(self, data, client_addr=None):
         """Publishes an event to the client.
 
         The publishing occurs only if the current client is subscribed to the topic for
