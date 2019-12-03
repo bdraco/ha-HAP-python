@@ -405,7 +405,7 @@ class AccessoryDriver:
                 if not subscribed_clients:
                     del self.topics[topic]
 
-    def publish(self, data):
+    def publish(self, data, client_addr):
         """Publishes an event to the client.
 
         The publishing occurs only if the current client is subscribed to the topic for
@@ -421,7 +421,7 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        self.event_queue.put((topic, bytedata))
+        self.event_queue.put((topic, bytedata, client_addr))
 
     def send_events(self):
         """Start sending events from the queue to clients.
@@ -445,10 +445,13 @@ class AccessoryDriver:
             # about the characteristic change as it can cause an HTTP disconnect and violates
             # the HAP spec
             #
-            topic, bytedata = self.event_queue.get()
+            topic, bytedata, sender_client_addr = self.event_queue.get()
             subscribed_clients = self.topics.get(topic, [])
             logger.debug('Send event: topic(%s), data(%s)', topic, bytedata)
             for client_addr in subscribed_clients.copy():
+                if sender_client_addr && sender_client_addr == sender_client_addr:
+                    logger.debug('Skip sending event to client since its the client that made the characteristic change: %s', client_addr)
+                    continue
                 logger.debug('Sending event to client: %s', client_addr)
                 pushed = self.http_server.push_event(bytedata, client_addr)
                 if not pushed:
@@ -643,7 +646,7 @@ class AccessoryDriver:
 
             if HAP_REPR_VALUE in cq:
                 # TODO: status needs to be based on success of set_value
-                char.client_update_value(cq[HAP_REPR_VALUE])
+                char.client_update_value(cq[HAP_REPR_VALUE], client_addr)
 
     def signal_handler(self, _signal, _frame):
         """Stops the AccessoryDriver for a given signal.
