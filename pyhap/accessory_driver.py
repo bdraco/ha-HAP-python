@@ -421,7 +421,6 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        logger.debug('Add Event: topic(%s), data(%s) sender_client_addr(%s)', topic, bytedata, sender_client_addr)
         self.event_queue.put((topic, bytedata, sender_client_addr))
 
     def send_events(self):
