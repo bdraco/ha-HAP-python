@@ -294,7 +294,7 @@ class Accessory:
 
     # Driver
 
-    def publish(self, value, sender, sender_client_addr):
+    def publish(self, value, sender, sender_client_addr=None):
         """Append AID and IID of the sender and forward it to the driver.
 
         Characteristics call this method to send updates.
