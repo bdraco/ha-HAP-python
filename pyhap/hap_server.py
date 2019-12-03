@@ -215,7 +215,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         # TODO: Is there a better way that doesn't involve
         # touching _headers_buffer ?
         #
-        logger.debug("Sender headers: %s", b"".join(self._headers_buffer))
         self.connection.sendall(b"".join(self._headers_buffer) + b"\r\n" + bytesdata)
         self._headers_buffer = []
 
