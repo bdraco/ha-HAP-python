@@ -219,6 +219,8 @@ class Characteristic:
         .. seealso:: accessory.publish
         .. seealso:: accessory_driver.publish
         """
+        import pprint
+        logger.debug('notify: self: %s', pprint.pprint(self))
         self.broker.publish(self.value, self)
 
     # pylint: disable=invalid-name
