@@ -201,7 +201,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(bytesdata))
         # Setting this head will take care of setting
         # self.close_connection to the right value
-        logger.debug("self.close_connection: %d", self.close_connection)
         self.send_header("Connection", ("close" if close_connection else "keep-alive"))
         # Important: we need to send the headers and the
         # content in a single write to avoid homekit
