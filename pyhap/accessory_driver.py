@@ -449,7 +449,7 @@ class AccessoryDriver:
             subscribed_clients = self.topics.get(topic, [])
             logger.debug('Send event: topic(%s), data(%s)', topic, bytedata)
             for client_addr in subscribed_clients.copy():
-                if sender_client_addr && sender_client_addr == sender_client_addr:
+                if sender_client_addr and sender_client_addr == sender_client_addr:
                     logger.debug('Skip sending event to client since its the client that made the characteristic change: %s', client_addr)
                     continue
                 logger.debug('Sending event to client: %s', client_addr)
