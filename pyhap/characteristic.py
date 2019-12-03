@@ -220,7 +220,7 @@ class Characteristic:
         .. seealso:: accessory_driver.publish
         """
         import pprint
-        logger.debug('notify: self: %s', pprint.pprint(self))
+        logger.debug('notify: self: %s', pprint.pprint(self.__dict__))
         self.broker.publish(self.value, self)
 
     # pylint: disable=invalid-name
