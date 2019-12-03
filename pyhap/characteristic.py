@@ -213,7 +213,7 @@ class Characteristic:
             # pylint: disable=not-callable
             self.setter_callback(value)
 
-    def notify(self):
+    def notify(self, client_addr):
         """Notify clients about a value change. Sends the value.
 
         .. seealso:: accessory.publish
