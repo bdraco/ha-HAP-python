@@ -405,7 +405,7 @@ class AccessoryDriver:
                 if not subscribed_clients:
                     del self.topics[topic]
 
-    def publish(self, data, client_addr=None):
+    def publish(self, data, sender_client_addr=None):
         """Publishes an event to the client.
 
         The publishing occurs only if the current client is subscribed to the topic for
@@ -421,7 +421,8 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        self.event_queue.put((topic, bytedata, client_addr))
+        logger.debug('Add Event: topic(%s), data(%s) sender_client_addr(%s)', topic, bytedata, sender_client_addr)
+        self.event_queue.put((topic, bytedata, sender_client_addr))
 
     def send_events(self):
         """Start sending events from the queue to clients.
@@ -447,7 +448,7 @@ class AccessoryDriver:
             #
             topic, bytedata, sender_client_addr = self.event_queue.get()
             subscribed_clients = self.topics.get(topic, [])
-            logger.debug('Send event: topic(%s), data(%s)', topic, bytedata)
+            logger.debug('Send event: topic(%s), data(%s), sender_client_addr(%s)', topic, bytedata, sender_client_addr)
             for client_addr in subscribed_clients.copy():
                 if sender_client_addr and sender_client_addr == sender_client_addr:
                     logger.debug('Skip sending event to client since its the client that made the characteristic change: %s', client_addr)
