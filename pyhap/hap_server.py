@@ -528,7 +528,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         chars = self.accessory_handler.get_characteristics(params["id"][0].split(","))
 
         data = json.dumps(chars).encode("utf-8")
-        logger.debug("handle_get_characteristics: %s", data)
         self.send_response(207)
         self.send_header("Content-Type", self.JSON_RESPONSE_TYPE)
         self.end_response(data)
@@ -775,13 +774,6 @@ class HAPSocket:
     def sendall(self, data, flags=0):
         """Encrypt and send the given data."""
 
-        # Warning: push_event has a race condition
-        #
-        # In the future it may be better make push_event
-        # tell the thread that is handling the connection
-        # to send the event at the next available time
-        # so it never happens in the middle of a recv
-
         assert not flags
         result = b""
         offset = 0
@@ -847,7 +839,6 @@ class HAPServer(socketserver.ThreadingMixIn,
         try:
             sock.shutdown(socket.SHUT_RDWR)
         except socket.error:
-            logger.info("Error shutting down socket: %s", socket.error)
             pass
         sock.close()
 
@@ -932,7 +923,6 @@ class HAPServer(socketserver.ThreadingMixIn,
             logger.debug('No socket for %s', client_addr)
             return False
         data = self.create_hap_event(bytesdata)
-        logger.debug("SEND EVENT: %s", data)
         try:
             client_socket.sendall(data)
             return True

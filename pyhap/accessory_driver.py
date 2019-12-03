@@ -441,7 +441,7 @@ class AccessoryDriver:
         while not self.loop.is_closed():
             # Maybe consider having a pool of worker threads, each performing a send in
             # order to increase throughput.
-            # 
+            #
             # Clients that made the characteristic change are NOT susposed to get events
             # about the characteristic change as it can cause an HTTP disconnect and violates
             # the HAP spec
