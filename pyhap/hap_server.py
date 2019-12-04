@@ -770,7 +770,6 @@ class HAPSocket:
     @_with_out_lock
     def sendall(self, data, flags=0):
         """Encrypt and send the given data."""
-
         assert not flags
         result = b""
         offset = 0
