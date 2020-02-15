@@ -185,7 +185,6 @@ class AccessoryDriver:
 
         self.accessory = None
         self.http_server_thread = None
-        self.advertiser = Zeroconf()
         self.persist_file = os.path.expanduser(persist_file)
         self.encoder = encoder or AccessoryEncoder()
         self.topics = {}  # topic: set of (address, port) of subscribed clients
@@ -274,6 +273,7 @@ class AccessoryDriver:
 
         # Advertise the accessory as a mDNS service.
         logger.debug('Starting mDNS.')
+        self.advertiser = Zeroconf()
         self.mdns_service_info = AccessoryMDNSServiceInfo(
             self.accessory, self.state)
         self.advertiser.register_service(self.mdns_service_info)
