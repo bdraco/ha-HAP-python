@@ -35,7 +35,7 @@ import threading
 import json
 import queue
 
-from zeroconf import ServiceInfo, Zeroconf
+from zeroconf import ServiceInfo, Zeroconf, InterfaceChoice
 
 from pyhap.accessory import get_topic
 from pyhap.characteristic import CharacteristicError
@@ -185,7 +185,7 @@ class AccessoryDriver:
 
         self.accessory = None
         self.http_server_thread = None
-        self.advertiser = Zeroconf()
+        self.advertiser = Zeroconf(interfaces=InterfaceChoice.Default)
         self.persist_file = os.path.expanduser(persist_file)
         self.encoder = encoder or AccessoryEncoder()
         self.topics = {}  # topic: set of (address, port) of subscribed clients
