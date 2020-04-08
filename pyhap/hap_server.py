@@ -875,6 +875,24 @@ class HAPServer(socketserver.ThreadingMixIn,
         self.connections[client_addr] = client_socket
         return (client_socket, client_addr)
 
+    def log_message(self, format, *args):
+        """Log an arbitrary message.
+        This is used by all other logging functions.  Override
+        it if you have specific logging wishes.
+        The first argument, FORMAT, is a format string for the
+        message to be logged.  If the format string contains
+        any % escapes requiring parameters, they should be
+        specified as subsequent arguments (it's just like
+        printf!).
+        The client ip and current date/time are prefixed to
+        every message.
+        """
+
+        logger.debug("%s - - [%s] %s\n" %
+                         (self.address_string(),
+                          self.log_date_time_string(),
+                          format%args))
+
     def finish_request(self, request, client_address):
         """Handle the client request.
 
