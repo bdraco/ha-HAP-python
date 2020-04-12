@@ -544,6 +544,8 @@ class Camera(Accessory):
 
         Called when iOS reads the StreaminStatus ``Characteristic``.
         """
+        logging.debug("Get streaming status: %s", self.streaming_status)
+
         return tlv.encode(b'\x01', self.streaming_status, to_base64=True)
 
     async def _stop_stream(self, objs):
