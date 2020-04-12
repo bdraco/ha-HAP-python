@@ -667,8 +667,8 @@ class Camera(Accessory):
             video_srtp_tlv = NO_SRTP
             audio_srtp_tlv = NO_SRTP
 
-        video_ssrc = int.from_bytes(os.urandom(3), byteorder="big")
-        audio_ssrc = int.from_bytes(os.urandom(3), byteorder="big")
+        video_ssrc = os.urandom(3)
+        audio_ssrc = os.urandom(3)
 
         res_address_tlv = tlv.encode(
             SETUP_ADDR_INFO['ADDRESS_VER'], self.stream_address_isv6,

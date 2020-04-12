@@ -76,7 +76,11 @@ def test_setup_endpoints(mock_driver):
                          .get_characteristic('SetupEndpoints')
     setup_endpoints.client_update_value(set_endpoint_req)
 
-    assert setup_endpoints.get_value() == set_endpoint_res
+    end_point_value = setup_endpoints.get_value()
+
+    # We have random bytes in the endpoint so only the
+    # first 161 chars will match
+    assert end_point_value[:161] == set_endpoint_res[:161]
 
 
 def test_set_selected_stream_start_stop(mock_driver):
