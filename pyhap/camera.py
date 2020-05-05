@@ -486,17 +486,21 @@ class Camera(Accessory):
             video_rtp_param = video_objs.get(VIDEO_TYPES['RTP_PARAM'])
             if video_rtp_param:
                 video_rtp_param_objs = tlv.decode(video_rtp_param)
-                # TODO: Optionals, handle the case where they are missing
-                opts['v_ssrc'] = struct.unpack('<I',
-                    video_rtp_param_objs.get(
-                        RTP_PARAM_TYPES['SYNCHRONIZATION_SOURCE']))[0]
-                opts['v_payload_type'] = \
-                    video_rtp_param_objs.get(RTP_PARAM_TYPES['PAYLOAD_TYPE'])
-                opts['v_max_bitrate'] = struct.unpack('<H',
-                    video_rtp_param_objs.get(RTP_PARAM_TYPES['MAX_BIT_RATE']))[0]
-                opts['v_rtcp_interval'] = struct.unpack('<f',
-                    video_rtp_param_objs.get(RTP_PARAM_TYPES['RTCP_SEND_INTERVAL']))[0]
-                opts['v_max_mtu'] = video_rtp_param_objs.get(RTP_PARAM_TYPES['MAX_MTU'])
+                if RTP_PARAM_TYPES['SYNCHRONIZATION_SOURCE'] in video_rtp_param_objs:
+                    opts['v_ssrc'] = struct.unpack('<I',
+                        video_rtp_param_objs.get(
+                            RTP_PARAM_TYPES['SYNCHRONIZATION_SOURCE']))[0]
+                if RTP_PARAM_TYPES['PAYLOAD_TYPE'] in video_rtp_param_objs:
+                    opts['v_payload_type'] = \
+                        video_rtp_param_objs.get(RTP_PARAM_TYPES['PAYLOAD_TYPE'])
+                if RTP_PARAM_TYPES['MAX_BIT_RATE'] in video_rtp_param_objs:
+                    opts['v_max_bitrate'] = struct.unpack('<H',
+                        video_rtp_param_objs.get(RTP_PARAM_TYPES['MAX_BIT_RATE']))[0]
+                if RTP_PARAM_TYPES['RTCP_SEND_INTERVAL'] in video_rtp_param_objs:
+                    opts['v_rtcp_interval'] = struct.unpack('<f',
+                        video_rtp_param_objs.get(RTP_PARAM_TYPES['RTCP_SEND_INTERVAL']))[0]
+                if RTP_PARAM_TYPES['MAX_MTU'] in video_rtp_param_objs:
+                    opts['v_max_mtu'] = video_rtp_param_objs.get(RTP_PARAM_TYPES['MAX_MTU'])
 
         if audio_tlv:
             audio_objs = tlv.decode(audio_tlv)
