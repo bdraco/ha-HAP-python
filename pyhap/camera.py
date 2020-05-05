@@ -456,6 +456,7 @@ class Camera(Accessory):
             started.
         :type reconfigure: bool
         """
+        logger.debug("Scheduling start_stream/reconfigure: %s", objs)
         video_tlv = objs.get(SELECTED_STREAM_CONFIGURATION_TYPES['VIDEO'])
         audio_tlv = objs.get(SELECTED_STREAM_CONFIGURATION_TYPES['AUDIO'])
 
