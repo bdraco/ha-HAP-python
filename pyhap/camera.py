@@ -463,7 +463,6 @@ class Camera(Accessory):
 
         if video_tlv:
             video_objs = tlv.decode(video_tlv)
-            logger.debug("Start Stream video objects: %s", video_objs)
 
             video_codec_params = video_objs.get(VIDEO_TYPES['CODEC_PARAM'])
             if video_codec_params:
@@ -504,7 +503,6 @@ class Camera(Accessory):
 
         if audio_tlv:
             audio_objs = tlv.decode(audio_tlv)
-            logger.debug("Start Stream audio objects: %s", audio_objs)
 
             opts['a_codec'] = audio_objs[AUDIO_TYPES['CODEC']]
             audio_codec_param_objs = tlv.decode(
