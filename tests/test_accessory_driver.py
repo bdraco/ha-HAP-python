@@ -19,6 +19,14 @@ CHAR_PROPS = {
 }
 
 
+class UnavailableAccessory(Accessory):
+    """An accessory that is not available."""
+
+    @property
+    def available(self):
+        return False
+
+
 @pytest.fixture
 def driver():
     with patch('pyhap.accessory_driver.HAPServer'), \
@@ -57,7 +65,7 @@ def test_persist_load():
 def test_service_callbacks(driver):
     bridge = Bridge(driver, "mybridge")
     acc = Accessory(driver, 'TestAcc', aid=2)
-    acc2 = Accessory(driver, 'TestAcc2', aid=3)
+    acc2 = UnavailableAccessory(driver, 'TestAcc2', aid=3)
 
     service = Service(uuid1(), 'Lightbulb')
     char_on = Characteristic('On', uuid1(), CHAR_PROPS)
@@ -114,6 +122,10 @@ def test_service_callbacks(driver):
 
     mock_callback2.assert_called_with({'On': True, 'Brightness': 12})
     mock_callback.assert_called_with({'On': True, 'Brightness': 88})
+
+    get_chars = driver.get_characteristics([f"{acc.aid}.{char_on_iid}", f"{acc2.aid}.{char_on2_iid}"])
+    assert get_chars == {'characteristics': [{'aid': acc.aid, 'iid': char_on_iid, 'status': 0, 'value': True},
+                     {'aid': acc2.aid, 'iid': char_on2_iid, 'status': -70402}]}
 
 
 def test_start_stop_sync_acc(driver):
