@@ -634,20 +634,22 @@ class AccessoryDriver:
                 HAP_REPR_STATUS: SERVICE_COMMUNICATION_FAILURE,
             }
 
-            if aid == STANDALONE_AID:
-                char = self.accessory.iid_manager.get_obj(iid)
-                available = True
-            else:
-                acc = self.accessory.accessories.get(aid)
-                available = acc.available
-                char = acc.iid_manager.get_obj(iid)
+            try:
+                if aid == STANDALONE_AID:
+                    char = self.accessory.iid_manager.get_obj(iid)
+                    available = True
+                else:
+                    acc = self.accessory.accessories.get(aid)
+                    available = acc.available
+                    char = acc.iid_manager.get_obj(iid)
 
-            if available:
-                try:
+                if available:
                     rep[HAP_REPR_VALUE] = char.get_value()
                     rep[HAP_REPR_STATUS] = CHAR_STAT_OK
-                except CharacteristicError:
-                    logger.error("Error getting value for characteristic %s.", id)
+            except CharacteristicError:
+                logger.error("Error getting value for characteristic %s.", id)
+            except Exception:  # pylint: disable=broad-except
+                logger.exception("Unexpected error getting value for characteristic %s.", id)
 
             chars.append(rep)
         logger.debug("Get chars response: %s", chars)
