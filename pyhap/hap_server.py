@@ -198,6 +198,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
         @note: Replaces self.request, self.wfile and self.rfile.
         """
+        self.wfile.flush() # flush before switching to encrypted
         self.request = self.server.upgrade_to_encrypted(self.client_address,
                                                         self.enc_context["shared_key"])
         # Recreate the file handles over the socket
@@ -228,7 +229,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         #
         self.connection.sendall(b"".join(self._headers_buffer) + b"\r\n" + bytesdata)
         self._headers_buffer = []
-        self.wfile.flush() #actually send the response if not already done.
         
     def dispatch(self):
         """Dispatch the request to the appropriate handler method."""
