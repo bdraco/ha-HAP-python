@@ -69,8 +69,9 @@ def test_persist_load():
 
 def test_external_zeroconf():
     zeroconf = MagicMock()
-    with patch('pyhap.accessory_driver.HAPServer'), \
-            patch('pyhap.accessory_driver.AccessoryDriver.persist'):
+    with patch("pyhap.accessory_driver.HAPServer"), patch(
+        "pyhap.accessory_driver.AccessoryDriver.persist"
+    ):
         driver = AccessoryDriver(port=51234, zeroconf_instance=zeroconf)
     assert driver.advertiser == zeroconf
 
@@ -145,7 +146,7 @@ def test_service_callbacks(driver):
     mock_callback.assert_called_with({"On": True, "Brightness": 88})
 
     get_chars = driver.get_characteristics(
-        [f"{acc.aid}.{char_on_iid}", f"{acc2.aid}.{char_on2_iid}"]
+        ["{}.{}".format(acc.aid, char_on_iid), "{}.{}".format(acc2.aid, char_on2_iid)]
     )
     assert get_chars == {
         "characteristics": [
@@ -160,10 +161,10 @@ def test_service_callbacks(driver):
     char_brightness.getter_callback = _fail_func
     get_chars = driver.get_characteristics(
         [
-            f"{acc.aid}.{char_on_iid}",
-            f"{acc2.aid}.{char_on2_iid}",
-            f"{acc2.aid}.{char_brightness2_iid}",
-            f"{acc.aid}.{char_brightness_iid}",
+            "{}.{}".format(acc.aid, char_on_iid),
+            "{}.{}".format(acc2.aid, char_on2_iid),
+            "{}.{}".format(acc2.aid, char_brightness_iid),
+            "{}.{}".format(acc.aid, char_brightness2_iid),
         ]
     )
     assert get_chars == {
