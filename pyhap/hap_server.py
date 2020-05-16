@@ -164,7 +164,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         super(HAPServerHandler, self).__init__(sock, client_addr, server)
 
     def log_message(self, format, *args):
-        logger.info("%s - %s", self.address_string(), format % args)
+        logger.debug("%s - %s", self.address_string(), format % args)
 
     def _set_encryption_ctx(self, client_public, private_key, public_key, shared_key,
                             pre_session_key):

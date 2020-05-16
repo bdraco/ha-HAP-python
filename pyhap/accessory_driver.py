@@ -599,20 +599,11 @@ class AccessoryDriver:
 
         :rtype: dict
         """
-
-        import cProfile
-        import random
-        pr = cProfile.Profile()
-        pr.enable()
-
         hap_rep = self.accessory.to_HAP()
         if not isinstance(hap_rep, list):
             hap_rep = [hap_rep, ]
         logger.debug("Get accessories response: %s", hap_rep)
-
-        pr.disable()
-        pr.create_stats()
-        pr.dump_stats(f"get_accessories.{random.random()}.cprof")        
+    
         return {HAP_REPR_ACCS: hap_rep}
 
     def get_characteristics(self, char_ids):
@@ -635,6 +626,11 @@ class AccessoryDriver:
 
         :rtype: dict
         """
+        import cProfile
+        import random
+        pr = cProfile.Profile()
+        pr.enable()
+
         chars = []
         for aid_iid in char_ids:
             aid, iid = (int(i) for i in aid_iid.split("."))
@@ -663,6 +659,10 @@ class AccessoryDriver:
 
             chars.append(rep)
         logger.debug("Get chars response: %s", chars)
+
+        pr.disable()
+        pr.create_stats()
+        pr.dump_stats(f"get_characteristics.{random.random()}.cprof")           
         return {HAP_REPR_CHARS: chars}
 
     def set_characteristics(self, chars_query, client_addr):
