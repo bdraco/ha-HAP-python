@@ -240,10 +240,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
         @note: Replaces self.request and self.rfile.
         """
-        # Important: We must flush before switching to encrypted
-        # as there may still be data in the buffer which will be
-        # lost we switch to encrypted which will result in the
-        # HAP client/controller having to reconnect and try again.
         self.request = self.server.upgrade_to_encrypted(self.client_address,
                                                         self.enc_context["shared_key"])
         # Recreate the file handles over the socket
@@ -258,6 +254,10 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
         @note: Replaces self.connection and self.wfile
         """
+        # Important: We must flush before switching to encrypted
+        # as there may still be data in the buffer which will be
+        # lost we switch to encrypted which will result in the
+        # HAP client/controller having to reconnect and try again.        
         self.wfile.flush()
         self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.wfile = self.connection.makefile('wb')  # pylint: disable=attribute-defined-outside-init
