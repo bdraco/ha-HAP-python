@@ -235,7 +235,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def _upgrade_reader_to_encrypted(self):
         """Set encryption for the underlying transport.
 
-        Call before sending the final unencrypted
+        Call BEFORE sending the final unencrypted
         response.
 
         @note: Replaces self.request and self.rfile.
@@ -249,7 +249,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def _upgrade_writer_to_encrypted(self):
         """Set encryption for the underlying transport. Step 2
 
-        Call after sending the final unencrypted
+        Call AFTER sending the final unencrypted
         response.
 
         @note: Replaces self.connection and self.wfile
