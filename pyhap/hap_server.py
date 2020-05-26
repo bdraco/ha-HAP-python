@@ -194,22 +194,34 @@ class HAPServerHandler(BaseHTTPRequestHandler):
             "pre_session_key": pre_session_key
         }
 
-    def _upgrade_to_encrypted(self):
+    def _upgrade_reader_to_encrypted(self):
         """Set encryption for the underlying transport.
 
-        @note: Replaces self.request, self.wfile and self.rfile.
+        Call BEFORE sending the final unencrypted
+        response.
+
+        @note: Replaces self.request and self.rfile.
+        """
+        self.request = self.server.upgrade_to_encrypted(self.client_address,
+                                                        self.enc_context["shared_key"])
+        # Recreate the file handles over the socket
+        # TODO: consider calling super().setup(), although semantically not correct
+        self.rfile = self.request.makefile('rb', self.rbufsize)  # pylint: disable=attribute-defined-outside-init
+
+    def _upgrade_writer_to_encrypted(self):
+        """Set encryption for the underlying transport. Step 2
+
+        Call AFTER sending the final unencrypted
+        response.
+
+        @note: Replaces self.connection and self.wfile
         """
         # Important: We must flush before switching to encrypted
         # as there may still be data in the buffer which will be
         # lost we switch to encrypted which will result in the
         # HAP client/controller having to reconnect and try again.
         self.wfile.flush()
-        self.request = self.server.upgrade_to_encrypted(self.client_address,
-                                                        self.enc_context["shared_key"])
-        # Recreate the file handles over the socket
-        # TODO: consider calling super().setup(), although semantically not correct
         self.connection = self.request  # pylint: disable=attribute-defined-outside-init
-        self.rfile = self.connection.makefile('rb', self.rbufsize)  # pylint: disable=attribute-defined-outside-init
         self.wfile = self.connection.makefile('wb')  # pylint: disable=attribute-defined-outside-init
         self.is_encrypted = True
 
@@ -526,8 +538,9 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b'\x04')
         self.send_response(200)
         self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
+        self._upgrade_reader_to_encrypted()
         self.end_response(data)
-        self._upgrade_to_encrypted()
+        self._upgrade_writer_to_encrypted()
         del self.enc_context
 
     def handle_accessories(self):
