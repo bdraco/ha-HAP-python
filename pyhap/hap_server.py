@@ -220,7 +220,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         # as there may still be data in the buffer which will be
         # lost we switch to encrypted which will result in the
         # HAP client/controller having to reconnect and try again.
-        self.wfile.flush()
         self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.wfile = self.connection.makefile('wb')  # pylint: disable=attribute-defined-outside-init
         self.is_encrypted = True
@@ -255,6 +254,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         #
         self.connection.sendall(b"".join(self._headers_buffer) + b"\r\n" + bytesdata)
         self._headers_buffer = []  # pylint: disable=attribute-defined-outside-init
+        self.wfile.flush()
 
     def dispatch(self):
         """Dispatch the request to the appropriate handler method."""
