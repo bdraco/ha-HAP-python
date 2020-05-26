@@ -244,12 +244,11 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         # as there may still be data in the buffer which will be
         # lost we switch to encrypted which will result in the
         # HAP client/controller having to reconnect and try again.
-        self.wfile.flush()
         self.request = self.server.upgrade_to_encrypted(self.client_address,
                                                         self.enc_context["shared_key"])
         # Recreate the file handles over the socket
         # TODO: consider calling super().setup(), although semantically not correct
-        self.rfile = self.connection.makefile('rb', self.rbufsize)  # pylint: disable=attribute-defined-outside-init
+        self.rfile = self.request.makefile('rb', self.rbufsize)  # pylint: disable=attribute-defined-outside-init
 
     def _upgrade_writer_to_encrypted(self):
         """Set encryption for the underlying transport. Step 2
