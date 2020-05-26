@@ -242,6 +242,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         # touching _headers_buffer ?
         #
         self.connection.sendall(b"".join(self._headers_buffer) + b"\r\n" + bytesdata)
+        logger.debug("end_response socket timeout: %s", self.connection.gettimeout())
         self._headers_buffer = []  # pylint: disable=attribute-defined-outside-init
 
     def dispatch(self):
@@ -903,7 +904,7 @@ class HAPServer(socketserver.ThreadingMixIn,
         client_socket, client_addr = super(HAPServer, self).get_request()
         logger.info("Got connection with %s.", client_addr)
         self.connections[client_addr] = client_socket
-        logger.debug("get_request socket timeout: %d", client_socket.gettimeout())
+        logger.debug("get_request socket timeout: %s", client_socket.gettimeout())
         return (client_socket, client_addr)
 
     def finish_request(self, request, client_address):
@@ -984,5 +985,5 @@ class HAPServer(socketserver.ThreadingMixIn,
         client_socket = self.connections[client_address]
         hap_socket = HAPSocket(client_socket, shared_key)
         self.connections[client_address] = hap_socket
-        logger.debug("upgrade_to_encrypted socket timeout: %d", hap_socket.gettimeout())
+        logger.debug("upgrade_to_encrypted socket timeout: %s", hap_socket.gettimeout())
         return hap_socket
