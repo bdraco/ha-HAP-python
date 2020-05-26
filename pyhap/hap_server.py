@@ -248,7 +248,6 @@ class HAPServerHandler(BaseHTTPRequestHandler):
                                                         self.enc_context["shared_key"])
         # Recreate the file handles over the socket
         # TODO: consider calling super().setup(), although semantically not correct
-        self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.rfile = self.connection.makefile('rb', self.rbufsize)  # pylint: disable=attribute-defined-outside-init
 
     def _upgrade_writer_to_encrypted(self):
@@ -257,8 +256,9 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         Call after sending the final unencrypted
         response.
 
-        @note: Replaces self.wfile
+        @note: Replaces self.connection and self.wfile
         """
+        self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.wfile.flush()
         self.wfile = self.connection.makefile('wb')  # pylint: disable=attribute-defined-outside-init
         self.is_encrypted = True        
