@@ -258,8 +258,8 @@ class HAPServerHandler(BaseHTTPRequestHandler):
 
         @note: Replaces self.connection and self.wfile
         """
-        self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.wfile.flush()
+        self.connection = self.request  # pylint: disable=attribute-defined-outside-init
         self.wfile = self.connection.makefile('wb')  # pylint: disable=attribute-defined-outside-init
         self.is_encrypted = True        
 
