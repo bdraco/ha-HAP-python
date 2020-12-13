@@ -769,8 +769,10 @@ class AccessoryDriver:
                 )
 
         if not errors:
+            logger.debug("Set chars response had not errors")
             return None
 
+        logger.debug("Set chars response had an error: %s", {HAP_REPR_CHARS: response})
         return {HAP_REPR_CHARS: response}
 
     def signal_handler(self, _signal, _frame):
