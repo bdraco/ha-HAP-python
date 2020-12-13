@@ -585,27 +585,34 @@ class HAPServerHandler(BaseHTTPRequestHandler):
     def handle_set_characteristics(self):
         """Handles a client request to update certain characteristics."""
         if not self.is_encrypted:
-            logger.warning('Attempt to access unauthorised content from %s',
-                           self.client_address)
+            logger.warning(
+                "Attempt to access unauthorised content from %s", self.client_address
+            )
             self.send_response(HTTPStatus.UNAUTHORIZED)
-            self.end_response(b'')
+            self.end_response(b"")
 
-        data_len = int(self.headers['Content-Length'])
-        requested_chars = json.loads(
-            self.rfile.read(data_len).decode('utf-8'))
-        logger.debug('Set characteristics content: %s', requested_chars)
+        data_len = int(self.headers["Content-Length"])
+        requested_chars = json.loads(self.rfile.read(data_len).decode("utf-8"))
+        logger.debug("Set characteristics content: %s", requested_chars)
 
         # TODO: Outline how chars return errors on set_chars.
         try:
-            self.accessory_handler.set_characteristics(requested_chars,
-                                                       self.client_address)
+            response = self.accessory_handler.set_characteristics(
+                requested_chars, self.client_address
+            )
         except Exception as e:  # pylint: disable=broad-except
-            logger.exception('Exception in set_characteristics: %s', e)
+            logger.exception("Exception in set_characteristics: %s", e)
             self.send_response(HTTPStatus.BAD_REQUEST)
-            self.end_response(b'')
+            self.end_response(b"")
         else:
+            if response:
+                self.send_response(HTTPStatus.MULTI_STATUS)
+                self.send_header("Content-Type", self.JSON_RESPONSE_TYPE)
+                self.end_response(json.dumps(response).encode("utf-8"))
+                return
+
             self.send_response(HTTPStatus.NO_CONTENT)
-            self.end_response(b'')
+            self.end_response(b"")
 
     def handle_pairings(self):
         """Handles a client request to update or remove a pairing."""

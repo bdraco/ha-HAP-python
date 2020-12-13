@@ -54,6 +54,7 @@ logger = logging.getLogger(__name__)
 
 CHAR_STAT_OK = 0
 SERVICE_COMMUNICATION_FAILURE = -70402
+INVALID_VALUE_IN_REQUEST = -70410
 SERVICE_CALLBACK = 0
 SERVICE_CALLBACK_DATA = 1
 HAP_SERVICE_TYPE = '_hap._tcp.local.'
@@ -704,9 +705,14 @@ class AccessoryDriver:
            }
 
         :type chars_query: dict
+
+        :rtype: dict
         """
         # TODO: Add support for chars that do no support notifications.
         service_callbacks = {}
+        response = []
+        errors = 0
+
         for cq in chars_query[HAP_REPR_CHARS]:
             aid, iid = cq[HAP_REPR_AID], cq[HAP_REPR_IID]
             char = self.accessory.get_characteristic(aid, iid)
@@ -721,6 +727,22 @@ class AccessoryDriver:
                 )
 
             if HAP_REPR_VALUE in cq:
+                try:
+                    char.to_valid_value(cq[HAP_REPR_VALUE])
+                    response.append(
+                        {HAP_REPR_AID: aid, HAP_REPR_IID: iid, HAP_REPR_STATUS: 0}
+                    )
+                except ValueError:
+                    errors += 1
+                    response.append(
+                        {
+                            HAP_REPR_AID: aid,
+                            HAP_REPR_IID: iid,
+                            HAP_REPR_STATUS: INVALID_VALUE_IN_REQUEST,
+                        }
+                    )
+                    continue
+
                 # TODO: status needs to be based on success of set_value
                 char.client_update_value(cq[HAP_REPR_VALUE], client_addr)
                 # For some services we want to send all the char value
@@ -745,6 +767,11 @@ class AccessoryDriver:
                 service_callbacks[aid][service_name][SERVICE_CALLBACK](
                     service_callbacks[aid][service_name][SERVICE_CALLBACK_DATA]
                 )
+
+        if not errors:
+            return None
+
+        return {HAP_REPR_CHARS: response}
 
     def signal_handler(self, _signal, _frame):
         """Stops the AccessoryDriver for a given signal.
