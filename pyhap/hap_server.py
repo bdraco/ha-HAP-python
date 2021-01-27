@@ -717,16 +717,7 @@ class HAPServerHandler:
 
 
 class HAPServerProtocol(asyncio.Protocol):
-    """A socket implementing the HAP crypto. Just feed it as if it is a normal socket.
-
-    This implementation is something like a Proxy pattern - some calls to socket
-    methods are wrapped and some are forwarded as is.
-
-    @note: HAP requires something like HTTP push. This implies we can have regular HTTP
-    response and an outbound HTTP push at the same time on the same socket - a race
-    condition. Thus, HAPSocket implements exclusive access to send and sendall to deal
-    with this situation.
-    """
+    """A asyncio.Protocol implementing the HAP protocol."""
 
     MAX_BLOCK_LENGTH = 0x400
     LENGTH_LENGTH = 2
@@ -735,7 +726,7 @@ class HAPServerProtocol(asyncio.Protocol):
     OUT_CIPHER_INFO = b"Control-Read-Encryption-Key"
     IN_CIPHER_INFO = b"Control-Write-Encryption-Key"
 
-    def __init__(self, loop, connections, accessory_handler):
+    def __init__(self, loop, connections, accessory_handler) -> None:
         self.loop = loop
         self.conn = h11.Connection(h11.SERVER)
         self.connections = connections
@@ -754,7 +745,7 @@ class HAPServerProtocol(asyncio.Protocol):
 
         self.curr_encrypted = b""  # Encrypted buffer
 
-    def _set_ciphers(self):
+    def _set_ciphers(self) -> None:
         """Generate out/inbound encryption keys and initialise respective ciphers."""
         outgoing_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.OUT_CIPHER_INFO)
         self.out_cipher = ChaCha20Poly1305(outgoing_key)
@@ -762,7 +753,7 @@ class HAPServerProtocol(asyncio.Protocol):
         incoming_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.IN_CIPHER_INFO)
         self.in_cipher = ChaCha20Poly1305(incoming_key)
 
-    def decrypt_buffer(self):
+    def decrypt_buffer(self) -> str:
         """Receive up to buflen bytes.
 
         The received full cipher blocks are decrypted and returned and partial cipher
@@ -798,26 +789,27 @@ class HAPServerProtocol(asyncio.Protocol):
 
         return result
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Exception) -> None:
         """Handle connection lost."""
+        logger.debug("%s: Connection lost: %s", self.peername, exc)
         self.close()
 
-    def connection_made(self, transport):
+    def connection_made(self, transport: asyncio.Transport) -> None:
         peername = transport.get_extra_info("peername")
-        logger.info("Connection from %s", peername)
+        logger.info("%s: Connection made", peername)
         self.transport = transport
         self.peername = peername
         self.connections[peername] = self
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
-    def write(self, data):
+    def write(self, data: bytes) -> None:
         if self.shared_key:
             self._write_encrypted(data)
         else:
             logger.debug("%s: Send unencrypted: %s", self.peername, data)
             self.transport.write(data)
 
-    def _write_encrypted(self, data):
+    def _write_encrypted(self, data: bytes) -> None:
         """Encrypt and send the given data."""
         result = b""
         offset = 0
@@ -836,13 +828,13 @@ class HAPServerProtocol(asyncio.Protocol):
         logger.debug("%s: Send encrypted: %s", self.peername, data)
         self.transport.write(result)
 
-    def close(self):
+    def close(self) -> None:
         """Remove the connection and close the transport."""
         if self.peername in self.connections:
             del self.connections[self.peername]
         self.transport.close()
 
-    def send_response(self, response):
+    def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""
         self.write(
             self.conn.send(
@@ -856,14 +848,14 @@ class HAPServerProtocol(asyncio.Protocol):
             + self.conn.send(h11.EndOfMessage())
         )
 
-    def _handle_response_ready(self, task):
+    def _handle_response_ready(self, task: asyncio.Task) -> None:
         """Handle delayed response."""
         response = self.response
         self.response = None
         response.body = task.result()
         self.send_response(response)
 
-    def data_received(self, data):
+    def data_received(self, data: bytes) -> None:
         """Process new data from the socket."""
         if self.shared_key:
             self.curr_encrypted += data
@@ -877,83 +869,75 @@ class HAPServerProtocol(asyncio.Protocol):
             self.conn.receive_data(data)
             logger.debug("%s: Recv unencrypted: %s", self.peername, data)
 
-        while True:
-            event = self.conn.next_event()
+        while self._process_one_event():
+            pass
 
-            response = None
-            logger.debug("%s: h11 Event: %s", self.peername, event)
-            if event is h11.NEED_DATA:
-                return
+    def _process_one_event(self) -> bool:
+        """Process one http event."""
+        event = self.conn.next_event()
 
-            if event is h11.PAUSED:
-                if self.request:
-                    logger.debug(
-                        "%s: Invalid state: PAUSED when a request is in progress: close the client socket",
-                        self.peername,
-                    )
-                    self.close()
-                    return
-                self.conn.start_next_cycle()
-                continue
+        logger.debug("%s: h11 Event: %s", self.peername, event)
 
-            if self.conn.our_state is h11.MUST_CLOSE:
-                logger.debug("%s: Connection state is must close", self.peername)
-                self.close()
-                return
+        if self.conn.our_state is h11.MUST_CLOSE:
+            return self._handle_invalid_conn_state("connection state is must close")
 
-            if type(event) is h11.Request:
-                self.request = None
-                if event.method in {b"PUT", b"POST"}:
-                    self.request = event
-                    continue
+        elif event is h11.NEED_DATA:
+            return False
 
-                elif event.method == b"GET":
-                    response = self.hap_server_handler.dispatch(event)
-
-            elif type(event) is h11.Data:
-                if not self.request:
-                    logger.debug(
-                        "%s: Invalid state: Data when not request: close the client socket",
-                        self.peername,
-                    )
-                    self.close()
-                    return
-
-                response = self.hap_server_handler.dispatch(
-                    self.request, bytes(event.data)
+        elif event is h11.PAUSED:
+            if self.request:
+                return self._handle_invalid_conn_state(
+                    "paused when a request is in progress"
                 )
-                self.request = None
+            self.conn.start_next_cycle()
+            return True
 
-            elif type(event) is h11.EndOfMessage:
-                self.request = None
-                continue
+        elif type(event) is h11.Request:
+            self.request = event
 
-            if response:
-                if response.task:
-                    self.response = response
-                    response.task.add_done_callback(self._handle_response_ready)
-                elif self.response:
-                    logger.debug(
-                        "%s: Invalid state, waiting for a response callback and tried to send another response: %s",
-                        self.peername,
-                        response,
-                    )
-                    self.close()
-                    return
-                else:
-                    self.send_response(response)
+            if event.method in {b"PUT", b"POST"}:
+                return True
 
-                if response.shared_key:
-                    self.shared_key = response.shared_key
-                    self._set_ciphers()
-            else:
-                logger.debug(
-                    "%s: Invalid response %s, Close the client socket",
-                    self.peername,
-                    event,
+            elif event.method == b"GET":
+                return self._process_response(
+                    self.hap_server_handler.dispatch(self.request)
                 )
-                self.close()
-                return
+
+        elif type(event) is h11.Data:
+            return self._process_response(
+                self.hap_server_handler.dispatch(self.request, bytes(event.data))
+            )
+
+        elif type(event) is h11.EndOfMessage:
+            self.request = None
+            return True
+
+    def _process_response(self, response) -> None:
+        """Process a response from the handler."""
+        if response.task:
+            # If there is a task pending we will schedule
+            # the response later
+            self.response = response
+            response.task.add_done_callback(self._handle_response_ready)
+        else:
+            self.send_response(response)
+
+        # If we get a shared key, upgrade to encrypted
+        if response.shared_key:
+            self.shared_key = response.shared_key
+            self._set_ciphers()
+
+        return True
+
+    def _handle_invalid_conn_state(self, message):
+        """Log invalid state and close."""
+        logger.debug(
+            "%s: Invalid state: %s: close the client socket",
+            message,
+            self.peername,
+        )
+        self.close()
+        return False
 
 
 class HAPServer:
@@ -991,6 +975,7 @@ class HAPServer:
         )
 
     def __init__(self, addr_port, accessory_handler):
+        """Create a HAP Server."""
         self._addr_port = addr_port
         self.connections = {}  # (address, port): socket
         self.accessory_handler = accessory_handler
