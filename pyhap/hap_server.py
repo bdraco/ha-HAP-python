@@ -844,7 +844,7 @@ class HAPServerProtocol(asyncio.Protocol):
                 return
 
             if event is h11.PAUSED:
-                if not self.request:
+                if self.request:
                     logger.debug(
                         "%s: Invalid state: PAUSED when a request is in progress: close the client socket",
                         self.peername,
