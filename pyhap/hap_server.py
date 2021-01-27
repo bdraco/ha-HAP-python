@@ -162,6 +162,7 @@ class HAPServerHandler:
         self.response_headers = []
         self.response_body = None
         self.response_status_message = "Internal Server Error"
+        self.response_upgrade_to_encrypted = False
 
     def log_message(self, format, *args):  # pylint: disable=redefined-builtin
         logger.info("%s - %s", self.address_string(), format % args)
@@ -195,37 +196,6 @@ class HAPServerHandler:
             "pre_session_key": pre_session_key,
         }
 
-    def _upgrade_reader_to_encrypted(self):
-        """Set encryption for the underlying transport.
-
-        Call BEFORE sending the final unencrypted
-        response.
-
-        @note: Replaces self.request and self.rfile.
-        """
-        self.request = self.server.upgrade_to_encrypted(
-            self.client_address, self.enc_context["shared_key"]
-        )
-        # Recreate the file handles over the socket
-        # TODO: consider calling super().setup(), although semantically not correct
-        self.rfile = self.request.makefile(
-            "rb", self.rbufsize
-        )  # pylint: disable=attribute-defined-outside-init
-
-    def _upgrade_writer_to_encrypted(self):
-        """Set encryption for the underlying transport. Step 2
-
-        Call AFTER sending the final unencrypted
-        response.
-
-        @note: Replaces self.connection and self.wfile
-        """
-        self.connection = self.request  # pylint: disable=attribute-defined-outside-init
-        self.wfile = self.connection.makefile(
-            "wb"
-        )  # pylint: disable=attribute-defined-outside-init
-        self.is_encrypted = True
-
     def send_response(self, code, message=None):
         """Add the response header to the headers buffer and log the
         response code.
@@ -255,14 +225,14 @@ class HAPServerHandler:
         self.response_status_message = "Internal Server Error"
         self.response_headers = []
         self.response_body = None
-        
+        self.response_upgrade_to_encrypted = False
 
         logger.debug(
             "Request %s from address '%s' for path '%s': %s",
             self.command,
             self.client_address,
             self.path,
-            self.headers
+            self.headers,
         )
 
         path = urlparse(self.path).path
@@ -285,7 +255,13 @@ class HAPServerHandler:
                 500, HAP_SERVER_STATUS.SERVICE_COMMUNICATION_FAILURE
             )
 
-        return self.response_status_code, self.response_status_message, self.response_headers, self.response_body
+        return (
+            self.response_status_code,
+            self.response_status_message,
+            self.response_headers,
+            self.response_body,
+            self.response_upgrade_to_encrypted,
+        )
 
     #        self.response = h11.Response(status_code=status_code, headers=headers)
 
@@ -602,9 +578,8 @@ class HAPServerHandler:
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b"\x04")
         self.send_response(200)
         self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self._upgrade_reader_to_encrypted()
+        self.response_upgrade_to_encrypted = self.enc_context["shared_key"]
         self.end_response(data)
-        self._upgrade_writer_to_encrypted()
         del self.enc_context
 
     def handle_accessories(self):
@@ -922,6 +897,24 @@ class HAPSocket:
 
 
 class HAPServerProtocol(asyncio.Protocol):
+    """A socket implementing the HAP crypto. Just feed it as if it is a normal socket.
+
+    This implementation is something like a Proxy pattern - some calls to socket
+    methods are wrapped and some are forwarded as is.
+
+    @note: HAP requires something like HTTP push. This implies we can have regular HTTP
+    response and an outbound HTTP push at the same time on the same socket - a race
+    condition. Thus, HAPSocket implements exclusive access to send and sendall to deal
+    with this situation.
+    """
+
+    MAX_BLOCK_LENGTH = 0x400
+    LENGTH_LENGTH = 2
+
+    CIPHER_SALT = b"Control-Salt"
+    OUT_CIPHER_INFO = b"Control-Read-Encryption-Key"
+    IN_CIPHER_INFO = b"Control-Write-Encryption-Key"
+
     def __init__(self, loop, connections, accessory_handler):
         self.loop = loop
         self.conn = h11.Connection(h11.SERVER)
@@ -929,6 +922,62 @@ class HAPServerProtocol(asyncio.Protocol):
         self.accessory_handler = accessory_handler
         self.hap_server_handler = None
         self.request = None
+        self._is_encrypted = False
+        self._write_lock = asyncio.Lock()  # for locking send operations
+
+        self.shared_key = None
+        self.out_count = 0
+        self.in_count = 0
+        self.out_cipher = None
+        self.in_cipher = None
+
+        self.curr_in_total = None  # Length of the current incoming block
+        self.num_in_recv = None  # Number of bytes received from the incoming block
+        self.curr_in_block = None  # Bytes of the current incoming block
+        self.curr_encrypted = b""  # Encrypted buffer
+
+    def _set_ciphers(self):
+        """Generate out/inbound encryption keys and initialise respective ciphers."""
+        outgoing_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.OUT_CIPHER_INFO)
+        self.out_cipher = ChaCha20Poly1305(outgoing_key)
+
+        incoming_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.IN_CIPHER_INFO)
+        self.in_cipher = ChaCha20Poly1305(incoming_key)
+
+    def decrypt_buffer(self):
+        """Receive up to buflen bytes.
+
+        The received full cipher blocks are decrypted and returned and partial cipher
+        blocks are buffered locally.
+        """
+        result = b""
+        if len(self.curr_encrypted) < self.LENGTH_LENGTH:
+            return result
+
+        # If we do not have a partial decrypted block
+        # read the next one
+        while len(self.curr_encrypted):
+            block_length_bytes = self.curr_encrypted[: self.LENGTH_LENGTH]
+            block_size = struct.unpack("H", block_length_bytes)[0]
+            data_size = self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
+
+            if len(self.curr_encrypted) >= data_size:
+                nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
+                result += self.in_cipher.decrypt(
+                    nonce,
+                    bytes(
+                        self.curr_encrypted[
+                            self.LENGTH_LENGTH : self.LENGTH_LENGTH + block_size
+                        ]
+                    ),
+                    struct.pack("H", block_size),
+                )
+                self.in_count += 1
+                self.curr_encrypted[:data_size]
+            else:
+                return result
+
+        return result
 
     def connection_made(self, transport):
         peername = transport.get_extra_info("peername")
@@ -937,10 +986,47 @@ class HAPServerProtocol(asyncio.Protocol):
         self.connections[peername] = transport
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
+    def write(self, data):
+        if self._is_encrypted:
+            self.write_encrypted(data)
+        else:
+            self.transport.write(data)
+
+    def write_encrypted(self, data):
+        with self._write_lock:
+            self._write_encrypted(data)
+
+    def _write_encrypted(self, data):
+        """Encrypt and send the given data."""
+        result = b""
+        offset = 0
+        total = len(data)
+        while offset < total:
+            length = min(total - offset, self.MAX_BLOCK_LENGTH)
+            length_bytes = struct.pack("H", length)
+            block = bytes(data[offset : offset + length])
+            nonce = _pad_tls_nonce(struct.pack("Q", self.out_count))
+            ciphertext = length_bytes + self.out_cipher.encrypt(
+                nonce, block, length_bytes
+            )
+            offset += length
+            self.out_count += 1
+            result += ciphertext
+        self.transport.write(result)
+        return total
+
     def data_received(self, data):
         print("Data received: {!r}".format(data))
 
-        self.conn.receive_data(data)
+        if self._is_encrypted:
+            self.curr_encrypted += data
+            unencrypted_data = self.decrypt_buffer()
+            if unencrypted_data == b"":
+                return
+        else:
+            unencrypted_data = data
+
+        self.conn.receive_data(unencrypted_data)
         event = None
         while True:
             event = self.conn.next_event()
@@ -951,8 +1037,8 @@ class HAPServerProtocol(asyncio.Protocol):
                 return
 
             if event is h11.PAUSED:
-                self.conn.start_next_cycle()     
-                continue      
+                self.conn.start_next_cycle()
+                continue
 
             if self.conn.our_state is h11.MUST_CLOSE:
                 print("Close the client socket")
@@ -974,7 +1060,9 @@ class HAPServerProtocol(asyncio.Protocol):
                     self.transport.close()
                     return
 
-                response_tup = self.hap_server_handler.dispatch(self.request, bytes(event.data))
+                response_tup = self.hap_server_handler.dispatch(
+                    self.request, bytes(event.data)
+                )
                 self.request = None
 
             elif type(event) is h11.EndOfMessage:
@@ -982,27 +1070,24 @@ class HAPServerProtocol(asyncio.Protocol):
                 continue
 
             if response_tup:
-                status_code, status_message, headers, body = response_tup
+                status_code, status_message, headers, body, shared_key = response_tup
                 data = (
-                    self.conn.send(h11.Response(status_code=status_code, reason=status_message, headers=headers))
+                    self.conn.send(
+                        h11.Response(
+                            status_code=status_code,
+                            reason=status_message,
+                            headers=headers,
+                        )
+                    )
                     + self.conn.send(h11.Data(data=body))
                     + self.conn.send(h11.EndOfMessage())
                 )
                 print("Data send: {!r}".format(data))
-                self.transport.write(data) 
+                self.write(data)
             else:
                 print("Invalid response {!r}, Close the client socket".format(event))
                 self.transport.close()
                 return
-
-
-
-
-
-#        self.response = h11.Response(status_code=status_code, headers=headers)
-
-
-# self.transport.close()
 
 
 class HAPServer:
