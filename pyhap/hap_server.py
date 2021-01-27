@@ -967,21 +967,10 @@ class HAPServer:
 
     def stop(self):
         self.server.close()
-        self._serve_task.cancel()
-
-    def server_close(self):
-        """Close all connections."""
-        logger.info("Stopping HAP server")
-
-        # When the AccessoryDriver is shutting down, it will stop advertising the
-        # Accessory on the network before stopping the server. At that point, clients
-        # can see the Accessory disappearing and could close the connection. This can
-        # happen while we deal with all connections here so we will get a "changed while
-        # iterating" exception. To avoid that, make a copy and iterate over it instead.
-        for sock in list(self.connections.values()):
-            self._close_socket(sock)
+        for hap_server_protocol in list(self.connections.values()):
+            hap_server_protocol.close()
         self.connections.clear()
-        super().server_close()
+        self._serve_task.cancel()
 
     def push_event(self, bytesdata, client_addr):
         """Send an event to the current connection with the provided data.
