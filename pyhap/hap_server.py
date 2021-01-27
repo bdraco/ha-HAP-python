@@ -844,6 +844,13 @@ class HAPServerProtocol(asyncio.Protocol):
                 return
 
             if event is h11.PAUSED:
+                if not self.request:
+                    logger.debug(
+                        "%s: Invalid state: PAUSED when a request is in progress: close the client socket",
+                        self.peername,
+                    )
+                    self.close()
+                    return
                 self.conn.start_next_cycle()
                 continue
 
@@ -864,7 +871,8 @@ class HAPServerProtocol(asyncio.Protocol):
             elif type(event) is h11.Data:
                 if not self.request:
                     logger.debug(
-                        "%s: Invalid state: close the client socket", self.peername
+                        "%s: Invalid state: Data when not request: close the client socket",
+                        self.peername,
                     )
                     self.close()
                     return
@@ -891,7 +899,6 @@ class HAPServerProtocol(asyncio.Protocol):
                     + self.conn.send(h11.Data(data=body))
                     + self.conn.send(h11.EndOfMessage())
                 )
-                logger.debug("%s: Data send: %s", self.peername, data)
                 self.write(data)
                 if shared_key:
                     self.shared_key = shared_key
