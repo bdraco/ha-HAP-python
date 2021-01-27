@@ -705,199 +705,6 @@ class HAPServerHandler:
         self.end_response(image)
 
 
-class HAPSocket:
-    """A socket implementing the HAP crypto. Just feed it as if it is a normal socket.
-
-    This implementation is something like a Proxy pattern - some calls to socket
-    methods are wrapped and some are forwarded as is.
-
-    @note: HAP requires something like HTTP push. This implies we can have regular HTTP
-    response and an outbound HTTP push at the same time on the same socket - a race
-    condition. Thus, HAPSocket implements exclusive access to send and sendall to deal
-    with this situation.
-    """
-
-    MAX_BLOCK_LENGTH = 0x400
-    LENGTH_LENGTH = 2
-
-    CIPHER_SALT = b"Control-Salt"
-    OUT_CIPHER_INFO = b"Control-Read-Encryption-Key"
-    IN_CIPHER_INFO = b"Control-Write-Encryption-Key"
-
-    def __init__(self, sock, shared_key):
-        """Initialise from the given socket."""
-        self.socket = sock
-
-        self.shared_key = shared_key
-        self.out_count = 0
-        self.in_count = 0
-        self.out_cipher = None
-        self.in_cipher = None
-        self.out_lock = threading.RLock()  # for locking send operations
-        # NOTE: Some future python implementation of HTTP Server or Server Handler can use
-        # methods different than the ones we lock now (send, sendall).
-        # This will break the encryption/decryption before introducing a race condition,
-        # but don't forget locking these other methods after fixing the crypto.
-
-        self._set_ciphers()
-        self.curr_in_total = None  # Length of the current incoming block
-        self.num_in_recv = None  # Number of bytes received from the incoming block
-        self.curr_in_block = None  # Bytes of the current incoming block
-        self.curr_decrypted = b""  # Decrypted buffer
-
-    def __getattr__(self, attribute_name):
-        """Defer unknown behaviour to the socket"""
-        return getattr(self.socket, attribute_name)
-
-    def _get_io_refs(self):
-        """Get `socket._io_refs`."""
-        return self.socket._io_refs  # pylint: disable=protected-access
-
-    def _set_io_refs(self, value):
-        """Set `socket._io_refs`."""
-        self.socket._io_refs = value  # pylint: disable=protected-access
-
-    _io_refs = property(_get_io_refs, _set_io_refs)
-    """`socket.makefile` uses a `SocketIO` to wrap the socket stream. Internally,
-    this uses `socket._io_refs` directly to determine if a socket object needs to be
-    closed when its FileIO object is closed.
-
-    Because `_io_refs` is assigned as part of this process, it bypasses getattr. To get
-    around this, let's make _io_refs our property and proxy calls to the socket.
-    """
-
-    def makefile(self, *args, **kwargs):
-        """Return a file object that reads/writes to this object.
-
-        We need to implement this, otherwise the socket's makefile will use the socket
-        object and we won't en/decrypt.
-        """
-        return socket.socket.makefile(self, *args, **kwargs)
-
-    def _set_ciphers(self):
-        """Generate out/inbound encryption keys and initialise respective ciphers."""
-        outgoing_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.OUT_CIPHER_INFO)
-        self.out_cipher = ChaCha20Poly1305(outgoing_key)
-
-        incoming_key = hap_hkdf(self.shared_key, self.CIPHER_SALT, self.IN_CIPHER_INFO)
-        self.in_cipher = ChaCha20Poly1305(incoming_key)
-
-    # socket.socket interface
-
-    def _with_out_lock(func):  # pylint: disable=no-self-argument
-        """Return a function that acquires the outbound lock and executes func."""
-
-        def _wrapper(self, *args, **kwargs):
-            with self.out_lock:
-                return func(self, *args, **kwargs)  # pylint: disable=not-callable
-
-        return _wrapper
-
-    def recv_into(self, buffer, nbytes=None, flags=0):
-        """Receive and decrypt up to nbytes in the given buffer."""
-        data = self.recv(nbytes or len(buffer), flags)
-        buffer[: len(data)] = data
-        return len(data)
-
-    def recv(self, buflen=1042, flags=0):
-        """Receive up to buflen bytes.
-
-        The received full cipher blocks are decrypted and returned and partial cipher
-        blocks are buffered locally.
-        """
-        assert not flags
-
-        if buflen == 0:
-            # If the reads get aligned just right, it possible that we
-            # could be asked to read zero bytes. Since we do not want to block
-            # we return an empty bytes string.
-            return b""
-
-        result = self.curr_decrypted
-
-        # If we do not have a partial decrypted block
-        # read the next one
-        while len(result) == 0:
-            # If we are not processing a block already, we need to first get the
-            # length of the next block, which is the first two bytes before it.
-            if self.curr_in_block is None:
-                # Always wait for a full block to arrive
-                block_length_bytes = self.socket.recv(
-                    self.LENGTH_LENGTH, socket.MSG_WAITALL
-                )
-                if not block_length_bytes:
-                    # Connection likely dropped
-                    return b""
-                # Init. info about the block we just started.
-                # Note we are setting the total length to block_length + mac length
-                self.curr_in_total = (
-                    struct.unpack("H", block_length_bytes)[0] + HAP_CRYPTO.TAG_LENGTH
-                )
-                self.num_in_recv = 0
-                self.curr_in_block = b""
-            else:
-                # Read as much from the current block as possible.
-                part = self.socket.recv(self.curr_in_total - self.num_in_recv)
-                # Check what is actually received
-                actual_len = len(part)
-                self.curr_in_block += part
-                self.num_in_recv += actual_len
-                if self.num_in_recv == self.curr_in_total:
-                    # We read a whole block. Decrypt it and append it to the result.
-                    nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
-                    # Note we are removing the mac length from the total length
-                    block_length = self.curr_in_total - HAP_CRYPTO.TAG_LENGTH
-                    result = self.in_cipher.decrypt(
-                        nonce, bytes(self.curr_in_block), struct.pack("H", block_length)
-                    )
-                    self.in_count += 1
-                    self.curr_in_block = None
-                    break
-                if not actual_len:
-                    # Connection likely dropped
-                    return b""
-
-        # The buffer can hold only
-        # part of the decrypted result
-        if buflen < len(result):
-            self.curr_decrypted = result[buflen:]
-            return result[:buflen]
-
-        # The buffer can hold the whole
-        # result
-        self.curr_decrypted = b""
-        return result
-
-    @_with_out_lock
-    def send(self, data, flags=0):
-        """Encrypt and send the given data."""
-        # TODO: the two methods need to be handled differently, but...
-        # The reason for the below hack is that SocketIO calls this method instead of
-        # sendall.
-        return self.sendall(data, flags)
-
-    @_with_out_lock
-    def sendall(self, data, flags=0):
-        """Encrypt and send the given data."""
-        assert not flags
-        result = b""
-        offset = 0
-        total = len(data)
-        while offset < total:
-            length = min(total - offset, self.MAX_BLOCK_LENGTH)
-            length_bytes = struct.pack("H", length)
-            block = bytes(data[offset : offset + length])
-            nonce = _pad_tls_nonce(struct.pack("Q", self.out_count))
-            ciphertext = length_bytes + self.out_cipher.encrypt(
-                nonce, block, length_bytes
-            )
-            offset += length
-            self.out_count += 1
-            result += ciphertext
-        self.socket.sendall(result)
-        return total
-
-
 class HAPServerProtocol(asyncio.Protocol):
     """A socket implementing the HAP crypto. Just feed it as if it is a normal socket.
 
@@ -957,7 +764,7 @@ class HAPServerProtocol(asyncio.Protocol):
             block_length_bytes = self.curr_encrypted[: self.LENGTH_LENGTH]
             block_size = struct.unpack("H", block_length_bytes)[0]
             data_size = self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
-            print ("block size", block_size, "data size", data_size)
+            print("block size", block_size, "data size", data_size)
 
             if len(self.curr_encrypted) < data_size:
                 print("not enough yet")
@@ -965,12 +772,12 @@ class HAPServerProtocol(asyncio.Protocol):
 
             if len(self.curr_encrypted) >= data_size:
                 nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
-                crypted_block =  bytes(
+                crypted_block = bytes(
                     self.curr_encrypted[
                         self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
                     ]
                 )
-                print ("cryypted block", crypted_block)
+                print("cryypted block", crypted_block)
                 result += self.in_cipher.decrypt(
                     nonce,
                     crypted_block,
@@ -1151,78 +958,12 @@ class HAPServer:
             self._addr_port[0],
             self._addr_port[1],
         )
-        print ("start")
+        print("start")
         self._serve_task = asyncio.create_task(self.server.serve_forever())
 
     def stop(self):
         self.server.close()
         self._serve_task.cancel()
-
-    def _close_socket(self, sock):  # pylint: disable=no-self-use
-        """Shutdown and close the given socket."""
-        try:
-            sock.shutdown(socket.SHUT_RDWR)
-        except socket.error:
-            pass
-        sock.close()
-
-    def _handle_sock_timeout(self, client_addr, exception):
-        """Handle a socket timeout.
-
-        Closes the socket for ``client_addr``.
-
-        :raise exception: if it is not a timeout.
-        """
-        # NOTE: In python <3.3 socket.timeout is not OSError, hence the above.
-        # Also, when it is actually an OSError, it MAY not have an errno equal to
-        # ETIMEDOUT.
-        logger.debug(
-            "Connection timeout for %s with exception %s", client_addr, exception
-        )
-        logger.debug("Current connections %s", self.connections)
-        sock = self.connections.pop(client_addr, None)
-        if sock is not None:
-            self._close_socket(sock)
-        if (
-            not isinstance(exception, socket.timeout)
-            and exception.errno not in self.TIMEOUT_ERRNO_CODES
-        ):
-            raise exception
-
-    def get_request(self):
-        """Calls the super's method, caches the connection and returns."""
-        client_socket, client_addr = super(HAPServer, self).get_request()
-        logger.info("Got connection with %s.", client_addr)
-        self.connections[client_addr] = client_socket
-        return (client_socket, client_addr)
-
-    def finish_request(self, request, client_address):
-        """Handle the client request.
-
-        HAP connections are not closed. Once the client negotiates a session,
-        the connection is kept open for both incoming and outgoing traffic, including
-        for sending events.
-
-        The client can gracefully close the connection, but in other cases it can just
-        leave, which will result in a timeout. In either case, we need to remove the
-        connection from ``self.connections``, because it could also be used for
-        pushing events to the server.
-        """
-        try:
-            self.RequestHandlerClass(
-                request, client_address, self, self.accessory_handler
-            )
-        except (OSError, socket.timeout) as e:
-            self._handle_sock_timeout(client_address, e)
-            logger.debug("Connection timeout")
-        except Exception as e:
-            logger.debug("finish_request: %s", e, exc_info=True)
-            raise
-        finally:
-            logger.debug("Cleaning connection to %s", client_address)
-            conn_sock = self.connections.pop(client_address, None)
-            if conn_sock is not None:
-                self._close_socket(conn_sock)
 
     def server_close(self):
         """Close all connections."""
@@ -1262,17 +1003,3 @@ class HAPServer:
             logger.debug("exception %s for %s in push_event()", e, client_addr)
             self._handle_sock_timeout(client_addr, e)
             return False
-
-    def upgrade_to_encrypted(self, client_address, shared_key):
-        """Replace the socket for the given client with HAPSocket.
-
-        @param client_address: The client address for which to upgrade the socket.
-        @type client_address: tuple(addr, port)
-
-        @param shared_key: The sessio key.
-        @type shared_key: bytes.
-        """
-        client_socket = self.connections[client_address]
-        hap_socket = HAPSocket(client_socket, shared_key)
-        self.connections[client_address] = hap_socket
-        return hap_socket
