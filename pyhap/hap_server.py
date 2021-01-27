@@ -4,27 +4,25 @@ The HAPServer is the point of contact to and from the world.
 The HAPServerHandler manages the state of the connection and handles incoming requests.
 The HAPSocket is a socket implementation that manages the "TLS" of the connection.
 """
-from http import HTTPStatus
+import asyncio
+import json
 import logging
 import struct
-import json
-import errno
 import uuid
-import h11
-import asyncio
-from urllib.parse import urlparse, parse_qs
-
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from http import HTTPStatus
+from urllib.parse import parse_qs, urlparse
 
 import curve25519
 import ed25519
+import h11
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 import pyhap.tlv as tlv
-from pyhap.util import long_to_bytes
 from pyhap.const import __version__
+from pyhap.util import long_to_bytes
 
 SNAPSHOT_TIMEOUT = 10
 
@@ -156,14 +154,16 @@ class HAPServerHandler:
         self.is_encrypted = False
         self.server_version = "pyhap/" + __version__
 
+        self.path = None
+        self.command = None
+        self.headers = None
+        self.request_body = None
+
         self.response_status_code = 500
         self.response_headers = []
         self.response_body = None
         self.response_status_message = "Internal Server Error"
         self.response_upgrade_to_encrypted = False
-
-    def log_message(self, format, *args):  # pylint: disable=redefined-builtin
-        logger.info("%s - %s", self.address_string(), format % args)
 
     def _set_encryption_ctx(
         self, client_public, private_key, public_key, shared_key, pre_session_key
@@ -965,6 +965,7 @@ class HAPServer:
         self.connections = {}  # (address, port): socket
         self.accessory_handler = accessory_handler
         self.server = None
+        self._serve_task = None
 
     async def async_start(self):
         loop = asyncio.get_running_loop()
