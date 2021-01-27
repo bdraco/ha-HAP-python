@@ -31,6 +31,16 @@ logger = logging.getLogger(__name__)
 backend = default_backend()
 
 
+class HAPResponse:
+    def __init__(self):
+        self.status_code: int = 500
+        self.reason: str = "Internal Server Error"
+        self.headers = []
+        self.body = []
+        self.shared_key = None
+        self.task = None
+
+
 # Various "tag" constants for HAP's TLV encoding.
 class HAP_TLV_TAGS:
     REQUEST_TYPE = b"\x00"
@@ -159,11 +169,7 @@ class HAPServerHandler:
         self.headers = None
         self.request_body = None
 
-        self.response_status_code = 500
-        self.response_headers = []
-        self.response_body = None
-        self.response_status_message = "Internal Server Error"
-        self.response_upgrade_to_encrypted = False
+        self.response = None
 
     def _set_encryption_ctx(
         self, client_public, private_key, public_key, shared_key, pre_session_key
@@ -199,16 +205,16 @@ class HAPServerHandler:
         response code.
         Does not add Server or Date
         """
-        self.response_status_code = code
-        self.response_status_message = message or "OK"
+        self.response.status_code = code
+        self.response.reason = message or "OK"
 
     def send_header(self, header, value):
         """Add the response header to the headers buffer."""
-        self.response_headers.append((header, value))
+        self.response.headers.append((header, value))
 
     def end_response(self, bytesdata):
         """Combines adding a length header and actually sending the data."""
-        self.response_body = bytesdata
+        self.response.body = bytesdata
 
     def dispatch(self, request, body=None):
         """Dispatch the request to the appropriate handler method."""
@@ -216,12 +222,8 @@ class HAPServerHandler:
         self.command = request.method.decode()
         self.headers = {k.decode(): v.decode() for k, v in request.headers}
         self.request_body = body
-
-        self.response_status_code = 500
-        self.response_status_message = "Internal Server Error"
-        self.response_headers = []
-        self.response_body = None
-        self.response_upgrade_to_encrypted = False
+        response = HAPResponse()
+        self.response = response
 
         logger.debug(
             "Request %s from address '%s' for path '%s': %s",
@@ -251,15 +253,8 @@ class HAPServerHandler:
                 500, HAP_SERVER_STATUS.SERVICE_COMMUNICATION_FAILURE
             )
 
-        return (
-            self.response_status_code,
-            self.response_status_message,
-            self.response_headers,
-            self.response_body,
-            self.response_upgrade_to_encrypted,
-        )
-
-    #        self.response = h11.Response(status_code=status_code, headers=headers)
+        self.response = None
+        return response
 
     def send_response_with_status(self, http_code, hap_server_status):
         """Send a generic HAP status response."""
@@ -690,21 +685,26 @@ class HAPServerHandler:
     def handle_resource(self):
         """Get a snapshot from the camera."""
         image_size = json.loads(self.request_body.decode("utf-8"))
+        loop = asyncio.get_event_loop()
         if hasattr(self.accessory_handler.accessory, "async_get_snapshot"):
             coro = self.accessory_handler.accessory.async_get_snapshot(image_size)
         elif hasattr(self.accessory_handler.accessory, "get_snapshot"):
-            coro = self.async_get_snapshot(image_size)
+            coro = asyncio.wait_for(
+                loop.run_in_executor(
+                    None, self.accessory_handler.accessory.get_snapshot, image_size
+                ),
+                SNAPSHOT_TIMEOUT,
+            )
         else:
             raise ValueError(
                 "Got a request for snapshot, but the Accessory "
                 'does not define a "get_snapshot" or "async_get_snapshot" method'
             )
 
-        loop = asyncio.get_running_loop()
-        image = asyncio.run_coroutine_threadsafe(coro, loop)
+        task = asyncio.create_task(coro)
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
-        self.end_response(image)
+        self.response.task = task
 
     async def async_get_snapshot(self, image_size):
         loop = asyncio.get_event_loop()
@@ -742,8 +742,9 @@ class HAPServerProtocol(asyncio.Protocol):
         self.accessory_handler = accessory_handler
         self.hap_server_handler = None
         self.peername = None
+
         self.request = None
-        self._write_lock = asyncio.Lock()  # for locking send operations
+        self.response = None
 
         self.shared_key = None
         self.out_count = 0
@@ -840,6 +841,27 @@ class HAPServerProtocol(asyncio.Protocol):
         self.connections.pop(self.peername)
         self.transport.close()
 
+    def send_response(self, response):
+        """Send a HAPResponse object."""
+        self.write(
+            self.conn.send(
+                h11.Response(
+                    status_code=response.status_code,
+                    reason=response.reason,
+                    headers=response.headers,
+                )
+            )
+            + self.conn.send(h11.Data(data=response.body))
+            + self.conn.send(h11.EndOfMessage())
+        )
+
+    def _handle_response_ready(self, task):
+        """Handle delayed response."""
+        response = self.response
+        self.response = None
+        response.body = task.result()
+        self.send_response(response)
+
     def data_received(self, data):
         """Process new data from the socket."""
         if self.shared_key:
@@ -857,7 +879,7 @@ class HAPServerProtocol(asyncio.Protocol):
         while True:
             event = self.conn.next_event()
 
-            response_tup = None
+            response = None
             logger.debug("%s: h11 Event: %s", self.peername, event)
             if event is h11.NEED_DATA:
                 return
@@ -885,7 +907,7 @@ class HAPServerProtocol(asyncio.Protocol):
                     continue
 
                 elif event.method == b"GET":
-                    response_tup = self.hap_server_handler.dispatch(event)
+                    response = self.hap_server_handler.dispatch(event)
 
             elif type(event) is h11.Data:
                 if not self.request:
@@ -896,7 +918,7 @@ class HAPServerProtocol(asyncio.Protocol):
                     self.close()
                     return
 
-                response_tup = self.hap_server_handler.dispatch(
+                response = self.hap_server_handler.dispatch(
                     self.request, bytes(event.data)
                 )
                 self.request = None
@@ -905,22 +927,23 @@ class HAPServerProtocol(asyncio.Protocol):
                 self.request = None
                 continue
 
-            if response_tup:
-                status_code, status_message, headers, body, shared_key = response_tup
-                data = (
-                    self.conn.send(
-                        h11.Response(
-                            status_code=status_code,
-                            reason=status_message,
-                            headers=headers,
-                        )
+            if response:
+                if response.task:
+                    self.response = response
+                    response.task.add_done_callback(self._handle_response_ready)
+                elif self.response:
+                    logger.debug(
+                        "%s: Invalid state, waiting for a response callback and tried to send another response: %s",
+                        self.peername,
+                        response,
                     )
-                    + self.conn.send(h11.Data(data=body))
-                    + self.conn.send(h11.EndOfMessage())
-                )
-                self.write(data)
-                if shared_key:
-                    self.shared_key = shared_key
+                    self.close()
+                    return
+                else:
+                    self.send_response(response)
+
+                if response.shared_key:
+                    self.shared_key = response.shared_key
                     self._set_ciphers()
             else:
                 logger.debug(
