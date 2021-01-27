@@ -696,7 +696,7 @@ class HAPServerHandler:
             )
 
         image = asyncio.run_coroutine_threadsafe(
-            self.async_get_snapshot, asyncio.get_running_loop()
+            self.async_get_snapshot(), asyncio.get_running_loop()
         )
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
