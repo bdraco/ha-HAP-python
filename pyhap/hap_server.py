@@ -689,19 +689,18 @@ class HAPServerHandler:
 
     def handle_resource(self):
         """Get a snapshot from the camera."""
-        if not hasattr(self.accessory_handler.accessory, "get_snapshot"):
-            raise ValueError(
-                "Got a request for snapshot, but the Accessory "
-                'does not define a "get_snapshot" method'
-            )
-
         image_size = json.loads(self.request_body.decode("utf-8"))
-        loop = asyncio.get_running_loop()
         if hasattr(self.accessory_handler.accessory, "async_get_snapshot"):
             coro = self.accessory_handler.accessory.async_get_snapshot(image_size)
-        else:
+        elif hasattr(self.accessory_handler.accessory, "get_snapshot"):
             coro = self.async_get_snapshot(image_size)
+        else:
+            raise ValueError(
+                "Got a request for snapshot, but the Accessory "
+                'does not define a "get_snapshot" or "async_get_snapshot" method'
+            )
 
+        loop = asyncio.get_running_loop()
         image = asyncio.run_coroutine_threadsafe(coro, loop)
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
