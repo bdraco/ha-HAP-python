@@ -578,8 +578,10 @@ class HAPServerHandler:
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b"\x04")
         self.send_response(200)
         self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.response_upgrade_to_encrypted = self.enc_context["shared_key"]
         self.end_response(data)
+
+        self.response_upgrade_to_encrypted = self.enc_context["shared_key"]
+        self.is_encrypted = True
         del self.enc_context
 
     def handle_accessories(self):
@@ -922,7 +924,6 @@ class HAPServerProtocol(asyncio.Protocol):
         self.accessory_handler = accessory_handler
         self.hap_server_handler = None
         self.request = None
-        self._is_encrypted = False
         self._write_lock = asyncio.Lock()  # for locking send operations
 
         self.shared_key = None
@@ -931,9 +932,6 @@ class HAPServerProtocol(asyncio.Protocol):
         self.out_cipher = None
         self.in_cipher = None
 
-        self.curr_in_total = None  # Length of the current incoming block
-        self.num_in_recv = None  # Number of bytes received from the incoming block
-        self.curr_in_block = None  # Bytes of the current incoming block
         self.curr_encrypted = b""  # Encrypted buffer
 
     def _set_ciphers(self):
@@ -951,29 +949,37 @@ class HAPServerProtocol(asyncio.Protocol):
         blocks are buffered locally.
         """
         result = b""
-        if len(self.curr_encrypted) < self.LENGTH_LENGTH:
-            return result
+        print("decrypt_buffer:", self.curr_encrypted)
 
         # If we do not have a partial decrypted block
         # read the next one
-        while len(self.curr_encrypted):
+        while len(self.curr_encrypted) > self.LENGTH_LENGTH:
             block_length_bytes = self.curr_encrypted[: self.LENGTH_LENGTH]
             block_size = struct.unpack("H", block_length_bytes)[0]
             data_size = self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
+            print ("block size", block_size, "data size", data_size)
+
+            if len(self.curr_encrypted) < data_size:
+                print("not enough yet")
+                return result
 
             if len(self.curr_encrypted) >= data_size:
                 nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
+                crypted_block =  bytes(
+                    self.curr_encrypted[
+                        self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
+                    ]
+                )
+                print ("cryypted block", crypted_block)
                 result += self.in_cipher.decrypt(
                     nonce,
-                    bytes(
-                        self.curr_encrypted[
-                            self.LENGTH_LENGTH : self.LENGTH_LENGTH + block_size
-                        ]
-                    ),
-                    struct.pack("H", block_size),
+                    crypted_block,
+                    block_length_bytes,
                 )
+                print("result:", result)
+
                 self.in_count += 1
-                self.curr_encrypted[:data_size]
+                self.curr_encrypted = self.curr_encrypted[data_size:]
             else:
                 return result
 
@@ -987,14 +993,10 @@ class HAPServerProtocol(asyncio.Protocol):
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
     def write(self, data):
-        if self._is_encrypted:
-            self.write_encrypted(data)
+        if self.shared_key:
+            self._write_encrypted(data)
         else:
             self.transport.write(data)
-
-    def write_encrypted(self, data):
-        with self._write_lock:
-            self._write_encrypted(data)
 
     def _write_encrypted(self, data):
         """Encrypt and send the given data."""
@@ -1013,12 +1015,11 @@ class HAPServerProtocol(asyncio.Protocol):
             self.out_count += 1
             result += ciphertext
         self.transport.write(result)
-        return total
 
     def data_received(self, data):
         print("Data received: {!r}".format(data))
 
-        if self._is_encrypted:
+        if self.shared_key:
             self.curr_encrypted += data
             unencrypted_data = self.decrypt_buffer()
             if unencrypted_data == b"":
@@ -1084,6 +1085,9 @@ class HAPServerProtocol(asyncio.Protocol):
                 )
                 print("Data send: {!r}".format(data))
                 self.write(data)
+                if shared_key:
+                    self.shared_key = shared_key
+                    self._set_ciphers()
             else:
                 print("Invalid response {!r}, Close the client socket".format(event))
                 self.transport.close()
@@ -1147,7 +1151,7 @@ class HAPServer:
             self._addr_port[0],
             self._addr_port[1],
         )
-
+        print ("start")
         self._serve_task = asyncio.create_task(self.server.serve_forever())
 
     def stop(self):
