@@ -12,7 +12,7 @@ from pyhap.const import (CATEGORY_FAN,
                          CATEGORY_SENSOR)
 
 
-logging.basicConfig(level=logging.INFO, format="[%(module)s] %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="[%(module)s] %(message)s")
 
 
 class TemperatureSensor(Accessory):

@@ -4,10 +4,8 @@ The HAPServer is the point of contact to and from the world.
 The HAPServerHandler manages the state of the connection and handles incoming requests.
 The HAPSocket is a socket implementation that manages the "TLS" of the connection.
 """
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from http import HTTPStatus
 import logging
-import socket
 import struct
 import json
 import errno
@@ -15,8 +13,6 @@ import uuid
 import h11
 import asyncio
 from urllib.parse import urlparse, parse_qs
-import socketserver
-import threading
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -210,8 +206,6 @@ class HAPServerHandler:
 
     def end_response(self, bytesdata):
         """Combines adding a length header and actually sending the data."""
-        #        if self.status_code != HTTPStatus.NO_CONTENT:
-        #            self.send_header("Content-Length", len(bytesdata))
         self.response_body = bytesdata
 
     def dispatch(self, request, body=None):
@@ -835,12 +829,12 @@ class HAPServerProtocol(asyncio.Protocol):
             if unencrypted_data == b"":
                 logger.debug("No decryptable data")
                 return
-            logger.debug("Decrypted block: %s", unencrypted_data)
+            logger.debug("Decrypted data: %s", unencrypted_data)
+            self.conn.receive_data(unencrypted_data)
         else:
-            unencrypted_data = data
+            self.conn.receive_data(data)
+            logger.debug("Unencrypted data: %s", data)
 
-        self.conn.receive_data(unencrypted_data)
-        event = None
         while True:
             event = self.conn.next_event()
 
@@ -924,15 +918,6 @@ class HAPServer:
         b"EVENT/1.0 200 OK\r\n"
         b"Content-Type: application/hap+json\r\n"
         b"Content-Length: "
-    )
-
-    TIMEOUT_ERRNO_CODES = (
-        errno.ECONNRESET,
-        errno.EPIPE,
-        errno.EHOSTUNREACH,
-        errno.ETIMEDOUT,
-        errno.EHOSTDOWN,
-        errno.EBADF,
     )
 
     @classmethod
