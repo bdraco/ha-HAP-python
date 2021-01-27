@@ -764,14 +764,13 @@ class HAPServerProtocol(asyncio.Protocol):
 
             if len(self.curr_encrypted) >= data_size:
                 nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
-                crypted_block = bytes(
-                    self.curr_encrypted[
-                        self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
-                    ]
-                )
                 result += self.in_cipher.decrypt(
                     nonce,
-                    crypted_block,
+                    bytes(
+                        self.curr_encrypted[
+                            self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
+                        ]
+                    ),
                     block_length_bytes,
                 )
                 self.in_count += 1
