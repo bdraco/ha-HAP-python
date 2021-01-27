@@ -302,8 +302,7 @@ class AccessoryDriver:
 
         # Start listening for requests
         logger.debug('Starting server.')
-        self.http_server_thread = threading.Thread(target=self.http_server.serve_forever)
-        self.http_server_thread.start()
+        self.http_server.async_start()
 
         # Advertise the accessory as a mDNS service.
         logger.debug('Starting mDNS.')
@@ -358,9 +357,7 @@ class AccessoryDriver:
         self.advertiser.close()
 
         logger.debug("Stopping HAP server")
-        self.http_server.shutdown()
-        self.http_server.server_close()
-        self.http_server_thread.join()
+        self.add_job(self.http_server.stop)
 
         logger.debug("AccessoryDriver stopped successfully")
 

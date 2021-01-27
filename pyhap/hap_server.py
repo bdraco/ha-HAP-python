@@ -12,6 +12,8 @@ import struct
 import json
 import errno
 import uuid
+import h11
+import asyncio
 from urllib.parse import urlparse, parse_qs
 import socketserver
 import threading
@@ -676,6 +678,7 @@ class HAPServerHandler(BaseHTTPRequestHandler):
         self.end_response(image)
 
 
+
 class HAPSocket:
     """A socket implementing the HAP crypto. Just feed it as if it is a normal socket.
 
@@ -866,8 +869,24 @@ class HAPSocket:
         return total
 
 
-class HAPServer(socketserver.ThreadingMixIn,
-                HTTPServer):
+class HAPServerProtocol(asyncio.Protocol):
+    def __init__(self, loop):
+        self.loop = loop
+
+    def connection_made(self, transport):
+        peername = transport.get_extra_info('peername')
+        print('Connection from {}'.format(peername))
+        self.transport = transport
+
+    def data_received(self, data):
+        message = data.decode()
+        print('Data received: {!r}'.format(message))
+
+        print('Close the client socket')
+        #self.transport.close()
+
+
+class HAPServer:
     """Point of contact for HAP clients.
 
     The HAPServer handles all incoming client requests (e.g. pair) and also handles
@@ -904,9 +923,25 @@ class HAPServer(socketserver.ThreadingMixIn,
                  addr_port,
                  accessory_handler,
                  handler_type=HAPServerHandler):
-        super(HAPServer, self).__init__(addr_port, handler_type)
+        self._addr_port = addr_port
+        self._handler_type = handler_type
         self.connections = {}  # (address, port): socket
         self.accessory_handler = accessory_handler
+        self.server = None
+
+    async def async_start(self):
+        loop = asyncio.get_running_loop()
+
+        self.server = await loop.create_server(
+            lambda: HAPServerProtocol(loop),
+            self._addr_port[0],
+            self._addr_port[1]
+        )
+
+        asyncio.create_task(self.server.serve_forever())
+
+    def stop(self):
+        self.server.close()
 
     def _close_socket(self, sock):  # pylint: disable=no-self-use
         """Shutdown and close the given socket."""
