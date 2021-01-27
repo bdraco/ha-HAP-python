@@ -730,6 +730,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.connections = connections
         self.accessory_handler = accessory_handler
         self.hap_server_handler = None
+        self.peername = None
         self.request = None
         self._write_lock = asyncio.Lock()  # for locking send operations
 
@@ -792,10 +793,15 @@ class HAPServerProtocol(asyncio.Protocol):
 
         return result
 
+    def connection_lost(self, exc):
+        """Handle connection lost."""
+        self.connections.pop(self.peername)
+
     def connection_made(self, transport):
         peername = transport.get_extra_info("peername")
         print("Connection from {}".format(peername))
         self.transport = transport
+        self.peername = peername
         self.connections[peername] = transport
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
@@ -991,15 +997,9 @@ class HAPServer:
         :return: True if sending was successful, False otherwise.
         :rtype: bool
         """
-        client_socket = self.connections.get(client_addr)
-        if client_socket is None:
+        hap_server_protocol = self.connections.get(client_addr)
+        if hap_server_protocol is None:
             logger.debug("No socket for %s", client_addr)
             return False
-        data = self.create_hap_event(bytesdata)
-        try:
-            client_socket.sendall(data)
-            return True
-        except (OSError, socket.timeout) as e:
-            logger.debug("exception %s for %s in push_event()", e, client_addr)
-            self._handle_sock_timeout(client_addr, e)
-            return False
+        hap_server_protocol.write(self.create_hap_event(bytesdata))
+        return True
