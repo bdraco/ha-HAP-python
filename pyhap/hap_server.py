@@ -26,6 +26,8 @@ import pyhap.tlv as tlv
 from pyhap.util import long_to_bytes
 from pyhap.const import __version__
 
+SNAPSHOT_TIMEOUT = 10
+
 logger = logging.getLogger(__name__)
 
 backend = default_backend()
@@ -706,7 +708,7 @@ class HAPServerHandler:
             loop.run_in_executor(
                 None, self.accessory_handler.accessory.get_snapshot, image_size
             ),
-            10,
+            SNAPSHOT_TIMEOUT,
         )
 
 
