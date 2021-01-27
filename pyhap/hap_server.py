@@ -794,6 +794,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
     def write(self, data):
+        logger.debug("%s: Send unencrypted: %s", self.peername, data)
         if self.shared_key:
             self._write_encrypted(data)
         else:
@@ -828,11 +829,11 @@ class HAPServerProtocol(asyncio.Protocol):
             if unencrypted_data == b"":
                 logger.debug("No decryptable data")
                 return
-            logger.debug("%s: Decrypted data: %s", self.peername, unencrypted_data)
+            logger.debug("%s: Recv decrypted: %s", self.peername, unencrypted_data)
             self.conn.receive_data(unencrypted_data)
         else:
             self.conn.receive_data(data)
-            logger.debug("%s: Unencrypted data: %s", self.peername, data)
+            logger.debug("%s: Recv unencrypted: %s", self.peername, data)
 
         while True:
             event = self.conn.next_event()
