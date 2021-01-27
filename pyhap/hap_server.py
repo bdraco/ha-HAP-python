@@ -800,22 +800,21 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         """Handle connection lost."""
-        logger.info("Connection lost %s: %s", self.peername, exc)
-        self.connections.pop(self.peername)
+        self.close()
 
     def connection_made(self, transport):
         peername = transport.get_extra_info("peername")
         logger.info("Connection from %s", peername)
         self.transport = transport
         self.peername = peername
-        self.connections[peername] = transport
+        self.connections[peername] = self
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
     def write(self, data):
-        logger.debug("%s: Send unencrypted: %s", self.peername, data)
         if self.shared_key:
             self._write_encrypted(data)
         else:
+            logger.debug("%s: Send unencrypted: %s", self.peername, data)
             self.transport.write(data)
 
     def _write_encrypted(self, data):
@@ -834,6 +833,7 @@ class HAPServerProtocol(asyncio.Protocol):
             offset += length
             self.out_count += 1
             result += ciphertext
+        logger.debug("%s: Send encrypted: %s", self.peername, data)
         self.transport.write(result)
 
     def close(self):

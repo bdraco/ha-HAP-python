@@ -22,33 +22,40 @@ or went to sleep before telling us. This concludes the publishing process from t
 AccessoryDriver.
 """
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import functools
-import os
-import logging
-import socket
-import hashlib
 import base64
-import sys
-import time
-import threading
+import functools
+import hashlib
 import json
+import logging
+import os
 import queue
+import socket
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from zeroconf import ServiceInfo, Zeroconf
 
+from pyhap import util
 from pyhap.accessory import get_topic
 from pyhap.characteristic import CharacteristicError
 from pyhap.const import (
-    STANDALONE_AID, HAP_PERMISSION_NOTIFY, HAP_REPR_ACCS, HAP_REPR_AID,
-    HAP_REPR_CHARS, HAP_REPR_IID, HAP_REPR_STATUS, HAP_REPR_VALUE)
+    HAP_PERMISSION_NOTIFY,
+    HAP_REPR_ACCS,
+    HAP_REPR_AID,
+    HAP_REPR_CHARS,
+    HAP_REPR_IID,
+    HAP_REPR_STATUS,
+    HAP_REPR_VALUE,
+    STANDALONE_AID,
+)
 from pyhap.encoder import AccessoryEncoder
 from pyhap.hap_server import HAPServer
 from pyhap.hsrp import Server as SrpServer
 from pyhap.loader import Loader
 from pyhap.params import get_srp_context
 from pyhap.state import State
-from pyhap import util
 
 logger = logging.getLogger(__name__)
 
@@ -56,18 +63,18 @@ CHAR_STAT_OK = 0
 SERVICE_COMMUNICATION_FAILURE = -70402
 SERVICE_CALLBACK = 0
 SERVICE_CALLBACK_DATA = 1
-HAP_SERVICE_TYPE = '_hap._tcp.local.'
+HAP_SERVICE_TYPE = "_hap._tcp.local."
 
 
 def callback(func):
     """Decorator for non blocking functions."""
-    setattr(func, '_pyhap_callback', True)
+    setattr(func, "_pyhap_callback", True)
     return func
 
 
 def is_callback(func):
     """Check if function is callback."""
-    return '_pyhap_callback' in getattr(func, '__dict__', {})
+    return "_pyhap_callback" in getattr(func, "__dict__", {})
 
 
 def iscoro(func):
@@ -88,10 +95,10 @@ class AccessoryMDNSServiceInfo(ServiceInfo):
 
         adv_data = self._get_advert_data()
         # Append part of MAC address to prevent name conflicts
-        name = '{} {}.{}'.format(
+        name = "{} {}.{}".format(
             self.accessory.display_name,
-            self.state.mac[-8:].replace(':', ''),
-            HAP_SERVICE_TYPE
+            self.state.mac[-8:].replace(":", ""),
+            HAP_SERVICE_TYPE,
         )
         super().__init__(
             HAP_SERVICE_TYPE,
@@ -100,7 +107,7 @@ class AccessoryMDNSServiceInfo(ServiceInfo):
             weight=0,
             priority=0,
             properties=adv_data,
-            addresses=[socket.inet_aton(self.state.address)]
+            addresses=[socket.inet_aton(self.state.address)],
         )
 
     def _setup_hash(self):
@@ -112,19 +119,19 @@ class AccessoryMDNSServiceInfo(ServiceInfo):
     def _get_advert_data(self):
         """Generate advertisement data from the accessory."""
         return {
-            'md': self.accessory.display_name,
-            'pv': '1.0',
-            'id': self.state.mac,
+            "md": self.accessory.display_name,
+            "pv": "1.0",
+            "id": self.state.mac,
             # represents the 'configuration version' of an Accessory.
             # Increasing this 'version number' signals iOS devices to
             # re-fetch accessories data.
-            'c#': str(self.state.config_version),
-            's#': '1',  # 'accessory state'
-            'ff': '0',
-            'ci': str(self.accessory.category),
+            "c#": str(self.state.config_version),
+            "s#": "1",  # 'accessory state'
+            "ff": "0",
+            "ci": str(self.accessory.category),
             # 'sf == 1' means "discoverable by HomeKit iOS clients"
-            'sf': '0' if self.state.paired else '1',
-            'sh': self._setup_hash()
+            "sf": "0" if self.state.paired else "1",
+            "sh": self._setup_hash(),
         }
 
 
@@ -141,11 +148,22 @@ class AccessoryDriver:
     """Number of HAP send events to be processed before reporting statistics on
     the event queue length."""
 
-    def __init__(self, *, address=None, port=51234,
-                 persist_file='accessory.state', pincode=None,
-                 encoder=None, loader=None, loop=None, mac=None,
-                 listen_address=None, advertised_address=None, interface_choice=None,
-                 zeroconf_instance=None):
+    def __init__(
+        self,
+        *,
+        address=None,
+        port=51234,
+        persist_file="accessory.state",
+        pincode=None,
+        encoder=None,
+        loader=None,
+        loop=None,
+        mac=None,
+        listen_address=None,
+        advertised_address=None,
+        interface_choice=None,
+        zeroconf_instance=None
+    ):
         """
         Initialize a new AccessoryDriver object.
 
@@ -193,14 +211,14 @@ class AccessoryDriver:
             of processing the same data multiple times.
         """
         if loop is None:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 loop = asyncio.ProactorEventLoop()
             else:
                 loop = asyncio.new_event_loop()
 
-            executor_opts = {'max_workers': None}
+            executor_opts = {"max_workers": None}
             if sys.version_info >= (3, 6):
-                executor_opts['thread_name_prefix'] = 'SyncWorker'
+                executor_opts["thread_name_prefix"] = "SyncWorker"
 
             self.executor = ThreadPoolExecutor(**executor_opts)
             loop.set_default_executor(self.executor)
@@ -210,7 +228,6 @@ class AccessoryDriver:
         self.loop = loop
 
         self.accessory = None
-        self.http_server_thread = None
         if zeroconf_instance is not None:
             self.advertiser = zeroconf_instance
         elif interface_choice is not None:
@@ -224,10 +241,7 @@ class AccessoryDriver:
         self.loader = loader or Loader()
         self.aio_stop_event = asyncio.Event(loop=loop)
         self.stop_event = threading.Event()
-        self.event_queue = (
-            queue.SimpleQueue() if hasattr(queue, "SimpleQueue") else queue.Queue()  # pylint: disable=no-member
-        )
-        self.send_event_thread = None  # the event dispatch thread
+        self.event_queue = asyncio.Queue(loop=loop)
         self.sent_events = 0
         self.accumulated_qsize = 0
 
@@ -238,7 +252,9 @@ class AccessoryDriver:
 
         address = address or util.get_local_address()
         advertised_address = advertised_address or address
-        self.state = State(address=advertised_address, mac=mac, pincode=pincode, port=port)
+        self.state = State(
+            address=advertised_address, mac=mac, pincode=pincode, port=port
+        )
 
         listen_address = listen_address or address
         network_tuple = (listen_address, self.state.port)
@@ -250,25 +266,26 @@ class AccessoryDriver:
         Pyhap will be stopped gracefully on a KeyBoardInterrupt.
         """
         try:
-            logger.info('Starting the event loop')
+            logger.info("Starting the event loop")
             if threading.current_thread() is threading.main_thread():
-                logger.debug('Setting child watcher')
+                logger.debug("Setting child watcher")
                 watcher = asyncio.SafeChildWatcher()
                 watcher.attach_loop(self.loop)
                 asyncio.set_child_watcher(watcher)
             else:
-                logger.debug('Not setting a child watcher. Set one if '
-                             'subprocesses will be started outside the main thread.')
+                logger.debug(
+                    "Not setting a child watcher. Set one if "
+                    "subprocesses will be started outside the main thread."
+                )
             self.add_job(self.start_service)
             self.loop.run_forever()
         except KeyboardInterrupt:
-            logger.debug('Got a KeyboardInterrupt, stopping driver')
-            self.loop.call_soon_threadsafe(
-                self.loop.create_task, self.async_stop())
+            logger.debug("Got a KeyboardInterrupt, stopping driver")
+            self.loop.call_soon_threadsafe(self.loop.create_task, self.async_stop())
             self.loop.run_forever()
         finally:
             self.loop.close()
-            logger.info('Closed the event loop')
+            logger.info("Closed the event loop")
 
     def start_service(self):
         """Starts the accessory.
@@ -283,11 +300,16 @@ class AccessoryDriver:
         daemon.
         """
         if self.accessory is None:
-            raise ValueError("You must assign an accessory to the driver, "
-                             "before you can start it.")
-        logger.info('Starting accessory %s on address %s, port %s.',
-                    self.accessory.display_name, self.state.address,
-                    self.state.port)
+            raise ValueError(
+                "You must assign an accessory to the driver, "
+                "before you can start it."
+            )
+        logger.info(
+            "Starting accessory %s on address %s, port %s.",
+            self.accessory.display_name,
+            self.state.address,
+            self.state.port,
+        )
 
         # Start sending events to clients. This is done in a daemon thread, because:
         # - if the queue is blocked waiting on an empty queue, then there is nothing left
@@ -296,18 +318,16 @@ class AccessoryDriver:
         #   finished, it will check the run sentinel, see that it is set and break the
         #   loop. Alternatively, the server's server_close method will shutdown and close
         #   the socket, while sending is in progress, which will result abort the sending.
-        logger.debug('Starting event thread.')
-        self.send_event_thread = threading.Thread(daemon=True, target=self.send_events)
-        self.send_event_thread.start()
+        logger.debug("Starting event thread.")
+        self.add_job(self.async_send_events)
 
         # Start listening for requests
-        logger.debug('Starting server.')
+        logger.debug("Starting server.")
         self.add_job(self.http_server.async_start)
 
         # Advertise the accessory as a mDNS service.
-        logger.debug('Starting mDNS.')
-        self.mdns_service_info = AccessoryMDNSServiceInfo(
-            self.accessory, self.state)
+        logger.debug("Starting mDNS.")
+        self.mdns_service_info = AccessoryMDNSServiceInfo(self.accessory, self.state)
         self.advertiser.register_service(self.mdns_service_info)
 
         # Print accessory setup message
@@ -315,24 +335,23 @@ class AccessoryDriver:
             self.accessory.setup_message()
 
         # Start the accessory so it can do stuff.
-        logger.debug('Starting accessory.')
+        logger.debug("Starting accessory.")
         self.add_job(self.accessory.run)
-        logger.debug('AccessoryDriver started successfully')
+        logger.debug("AccessoryDriver started successfully")
 
     def stop(self):
         """Method to stop pyhap."""
-        self.loop.call_soon_threadsafe(
-            self.loop.create_task, self.async_stop())
+        self.loop.call_soon_threadsafe(self.loop.create_task, self.async_stop())
 
     async def async_stop(self):
         """Stops the AccessoryDriver and shutdown all remaining tasks."""
         await self.async_add_job(self._do_stop)
         # Executor=None means a loop wasn't passed in
         if self.executor is not None:
-            logger.debug('Shutdown executors')
+            logger.debug("Shutdown executors")
             self.executor.shutdown()
             self.loop.stop()
-        logger.debug('Stop completed')
+        logger.debug("Stop completed")
 
     def _do_stop(self):
         """Stop the accessory.
@@ -344,9 +363,12 @@ class AccessoryDriver:
         """
         # TODO: This should happen in a different order - mDNS, server, accessory. Need
         # to ensure that sending with a closed server will not crash the app.
-        logger.info("Stopping accessory %s on address %s, port %s.",
-                    self.accessory.display_name, self.state.address,
-                    self.state.port)
+        logger.info(
+            "Stopping accessory %s on address %s, port %s.",
+            self.accessory.display_name,
+            self.state.address,
+            self.state.port,
+        )
         logger.debug("Setting stop events, stopping accessory and event sending")
         self.stop_event.set()
         self.loop.call_soon_threadsafe(self.aio_stop_event.set)
@@ -453,9 +475,9 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        self.event_queue.put((topic, bytedata, sender_client_addr))
+        asyncio.create_task(self.event_queue.put((topic, bytedata, sender_client_addr)))
 
-    def send_events(self):
+    async def async_send_events(self):
         """Start sending events from the queue to clients.
 
         This continues until self.run_sentinel is set. The method logs the average
@@ -469,7 +491,7 @@ class AccessoryDriver:
         this is not run in a daemon thread or it is run on the main thread, the app will
         hang.
         """
-        while not self.loop.is_closed():
+        while not self.loop.is_closed() and not self.aio_stop_event.is_set():
             # Maybe consider having a pool of worker threads, each performing a send in
             # order to increase throughput.
             #
@@ -477,27 +499,29 @@ class AccessoryDriver:
             # about the characteristic change as it can cause an HTTP disconnect and violates
             # the HAP spec
             #
-            topic, bytedata, sender_client_addr = self.event_queue.get()
+            topic, bytedata, sender_client_addr = await self.event_queue.get()
             subscribed_clients = self.topics.get(topic, [])
             logger.debug(
-                'Send event: topic(%s), data(%s), sender_client_addr(%s)',
+                "Send event: topic(%s), data(%s), sender_client_addr(%s)",
                 topic,
                 bytedata,
-                sender_client_addr
+                sender_client_addr,
             )
             for client_addr in subscribed_clients.copy():
                 if sender_client_addr and sender_client_addr == client_addr:
                     logger.debug(
-                        'Skip sending event to client since '
-                        'its the client that made the characteristic change: %s',
-                        client_addr
+                        "Skip sending event to client since "
+                        "its the client that made the characteristic change: %s",
+                        client_addr,
                     )
                     continue
-                logger.debug('Sending event to client: %s', client_addr)
+                logger.debug("Sending event to client: %s", client_addr)
                 pushed = self.http_server.push_event(bytedata, client_addr)
                 if not pushed:
-                    logger.debug('Could not send event to %s, probably stale socket.',
-                                 client_addr)
+                    logger.debug(
+                        "Could not send event to %s, probably stale socket.",
+                        client_addr,
+                    )
                     # Maybe consider removing the client_addr from every topic?
                     self.subscribe_client_topic(client_addr, topic, False)
             if hasattr(self.event_queue, "task_done"):
@@ -506,8 +530,11 @@ class AccessoryDriver:
             self.accumulated_qsize += self.event_queue.qsize()
 
             if self.sent_events > self.NUM_EVENTS_BEFORE_STATS:
-                logger.debug('Average queue size for the past %s events: %.2f',
-                             self.sent_events, self.accumulated_qsize / self.sent_events)
+                logger.debug(
+                    "Average queue size for the past %s events: %.2f",
+                    self.sent_events,
+                    self.accumulated_qsize / self.sent_events,
+                )
                 self.sent_events = 0
                 self.accumulated_qsize = 0
 
@@ -525,19 +552,18 @@ class AccessoryDriver:
     def update_advertisement(self):
         """Updates the mDNS service info for the accessory."""
         self.advertiser.unregister_service(self.mdns_service_info)
-        self.mdns_service_info = AccessoryMDNSServiceInfo(
-            self.accessory, self.state)
+        self.mdns_service_info = AccessoryMDNSServiceInfo(self.accessory, self.state)
         time.sleep(0.1)  # Doing it right away can cause crashes.
         self.advertiser.register_service(self.mdns_service_info)
 
     def persist(self):
         """Saves the state of the accessory."""
-        with open(self.persist_file, 'w') as fp:
+        with open(self.persist_file, "w") as fp:
             self.encoder.persist(fp, self.state)
 
     def load(self):
         """ """
-        with open(self.persist_file, 'r') as fp:
+        with open(self.persist_file, "r") as fp:
             self.encoder.load_into(fp, self.state)
 
     def pair(self, client_uuid, client_public):
@@ -598,7 +624,7 @@ class AccessoryDriver:
         """Create an SRP verifier for the accessory's info."""
         # TODO: Move the below hard-coded values somewhere nice.
         ctx = get_srp_context(3072, hashlib.sha512, 16)
-        verifier = SrpServer(ctx, b'Pair-Setup', self.state.pincode)
+        verifier = SrpServer(ctx, b"Pair-Setup", self.state.pincode)
         self.srp_verifier = verifier
 
     def get_accessories(self):
@@ -628,7 +654,9 @@ class AccessoryDriver:
         """
         hap_rep = self.accessory.to_HAP()
         if not isinstance(hap_rep, list):
-            hap_rep = [hap_rep, ]
+            hap_rep = [
+                hap_rep,
+            ]
         logger.debug("Get accessories response: %s", hap_rep)
         return {HAP_REPR_ACCS: hap_rep}
 
@@ -678,7 +706,9 @@ class AccessoryDriver:
             except CharacteristicError:
                 logger.error("Error getting value for characteristic %s.", id)
             except Exception:  # pylint: disable=broad-except
-                logger.exception("Unexpected error getting value for characteristic %s.", id)
+                logger.exception(
+                    "Unexpected error getting value for characteristic %s.", id
+                )
 
             chars.append(rep)
         logger.debug("Get chars response: %s", chars)
