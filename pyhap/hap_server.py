@@ -692,11 +692,22 @@ class HAPServerHandler:
                 "Got a request for snapshot, but the Accessory "
                 'does not define a "get_snapshot" method'
             )
-        image_size = json.loads(self.request_body.decode("utf-8"))
-        image = self.accessory_handler.accessory.get_snapshot(image_size)
+
+        image = asyncio.run_coroutine_threadsafe(None, self.async_get_snapshot)
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
         self.end_response(image)
+
+    async def async_get_snapshot(self):
+        loop = asyncio.get_event_loop()
+        image_size = json.loads(self.request_body.decode("utf-8"))
+
+        return await asyncio.wait_for(
+            loop.run_in_executor(
+                None, self.accessory_handler.accessory.get_snapshot, image_size
+            ),
+            10,
+        )
 
 
 class HAPServerProtocol(asyncio.Protocol):
