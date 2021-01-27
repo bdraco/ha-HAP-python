@@ -695,17 +695,20 @@ class HAPServerHandler:
                 'does not define a "get_snapshot" method'
             )
 
-        image = asyncio.run_coroutine_threadsafe(
-            self.async_get_snapshot(), asyncio.get_running_loop()
-        )
+        image_size = json.loads(self.request_body.decode("utf-8"))
+        loop = asyncio.get_running_loop()
+        if hasattr(self.accessory_handler.accessory, "async_get_snapshot"):
+            coro = self.accessory_handler.accessory.async_get_snapshot(image_size)
+        else:
+            coro = self.async_get_snapshot(image_size)
+
+        image = asyncio.run_coroutine_threadsafe(coro, loop)
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
         self.end_response(image)
 
-    async def async_get_snapshot(self):
+    async def async_get_snapshot(self, image_size):
         loop = asyncio.get_event_loop()
-        image_size = json.loads(self.request_body.decode("utf-8"))
-
         return await asyncio.wait_for(
             loop.run_in_executor(
                 None, self.accessory_handler.accessory.get_snapshot, image_size
