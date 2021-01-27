@@ -695,7 +695,9 @@ class HAPServerHandler:
                 'does not define a "get_snapshot" method'
             )
 
-        image = asyncio.run_coroutine_threadsafe(None, self.async_get_snapshot)
+        image = asyncio.run_coroutine_threadsafe(
+            self.async_get_snapshot, asyncio.get_running_loop()
+        )
         self.send_response(200)
         self.send_header("Content-Type", "image/jpeg")
         self.end_response(image)
@@ -795,7 +797,7 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         """Handle connection lost."""
-        logger.info("Connection lost %s", self.peername)
+        logger.info("Connection lost %s: %s", self.peername, exc)
         self.connections.pop(self.peername)
 
     def connection_made(self, transport):
@@ -832,10 +834,12 @@ class HAPServerProtocol(asyncio.Protocol):
         self.transport.write(result)
 
     def close(self):
+        """Remove the connection and close the transport."""
         self.connections.pop(self.peername)
         self.transport.close()
 
     def data_received(self, data):
+        """Process new data from the socket."""
         if self.shared_key:
             self.curr_encrypted += data
             unencrypted_data = self.decrypt_buffer()
@@ -968,6 +972,7 @@ class HAPServer:
         self._serve_task = None
 
     async def async_start(self):
+        """Start the http-hap server."""
         loop = asyncio.get_running_loop()
 
         self.server = await loop.create_server(
@@ -978,6 +983,7 @@ class HAPServer:
         self._serve_task = asyncio.create_task(self.server.serve_forever())
 
     def stop(self):
+        """Stop the server."""
         self.server.close()
         for hap_server_protocol in list(self.connections.values()):
             hap_server_protocol.close()
