@@ -789,11 +789,12 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         """Handle connection lost."""
+        logger.info("Connection lost %s", self.peername)
         self.connections.pop(self.peername)
 
     def connection_made(self, transport):
         peername = transport.get_extra_info("peername")
-        print("Connection from {}".format(peername))
+        logger.info("Connection from %s", peername)
         self.transport = transport
         self.peername = peername
         self.connections[peername] = transport
@@ -962,7 +963,6 @@ class HAPServer:
             self._addr_port[0],
             self._addr_port[1],
         )
-        print("start")
         self._serve_task = asyncio.create_task(self.server.serve_forever())
 
     def stop(self):
