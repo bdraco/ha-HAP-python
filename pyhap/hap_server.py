@@ -828,17 +828,17 @@ class HAPServerProtocol(asyncio.Protocol):
             if unencrypted_data == b"":
                 logger.debug("No decryptable data")
                 return
-            logger.debug("Decrypted data: %s", unencrypted_data)
+            logger.debug("%s: Decrypted data: %s", self.peername, unencrypted_data)
             self.conn.receive_data(unencrypted_data)
         else:
             self.conn.receive_data(data)
-            logger.debug("Unencrypted data: %s", data)
+            logger.debug("%s: Unencrypted data: %s", self.peername, data)
 
         while True:
             event = self.conn.next_event()
 
             response_tup = None
-            logger.debug("h11 Event: %s", event)
+            logger.debug("%s: h11 Event: %s", self.peername, event)
             if event is h11.NEED_DATA:
                 return
 
@@ -847,7 +847,7 @@ class HAPServerProtocol(asyncio.Protocol):
                 continue
 
             if self.conn.our_state is h11.MUST_CLOSE:
-                logger.debug("Connection state is must close")
+                logger.debug("%s: Connection state is must close", self.peername)
                 self.close()
                 return
 
@@ -862,7 +862,9 @@ class HAPServerProtocol(asyncio.Protocol):
 
             elif type(event) is h11.Data:
                 if not self.request:
-                    logger.debug("Invalid state: close the client socket")
+                    logger.debug(
+                        "%s: Invalid state: close the client socket", self.peername
+                    )
                     self.close()
                     return
 
@@ -888,13 +890,17 @@ class HAPServerProtocol(asyncio.Protocol):
                     + self.conn.send(h11.Data(data=body))
                     + self.conn.send(h11.EndOfMessage())
                 )
-                logger.debug("Data send: %s", data)
+                logger.debug("%s: Data send: %s", self.peername, data)
                 self.write(data)
                 if shared_key:
                     self.shared_key = shared_key
                     self._set_ciphers()
             else:
-                logger.debug("Invalid response %s, Close the client socket".event)
+                logger.debug(
+                    "%s: Invalid response %s, Close the client socket",
+                    self.peername,
+                    event,
+                )
                 self.close()
                 return
 
