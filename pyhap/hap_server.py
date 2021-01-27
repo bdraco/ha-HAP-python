@@ -571,7 +571,7 @@ class HAPServerHandler:
         self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
         self.end_response(data)
 
-        self.response_upgrade_to_encrypted = self.enc_context["shared_key"]
+        self.response.shared_key = self.enc_context["shared_key"]
         self.is_encrypted = True
         del self.enc_context
 
@@ -838,7 +838,8 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def close(self):
         """Remove the connection and close the transport."""
-        self.connections.pop(self.peername)
+        if self.peername in self.connections:
+            del self.connections[self.peername]
         self.transport.close()
 
     def send_response(self, response):
