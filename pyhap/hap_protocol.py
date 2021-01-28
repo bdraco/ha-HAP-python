@@ -1,6 +1,5 @@
 """This module implements the communication of HAP.
 
-The HAPServerHandler manages the state of the connection and handles incoming requests.
 The HAPServerProtocol is a protocol implementation that manages the "TLS" of the connection.
 """
 import asyncio
