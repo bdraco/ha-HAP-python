@@ -225,6 +225,7 @@ class AccessoryDriver:
         else:
             self.executor = None
 
+        self.tid = threading.current_thread()
         self.loop = loop
 
         self.accessory = None
@@ -319,7 +320,7 @@ class AccessoryDriver:
         #   loop. Alternatively, the server's server_close method will shutdown and close
         #   the socket, while sending is in progress, which will result abort the sending.
         logger.debug("Starting event thread.")
-        self.add_job(self.async_send_events)
+        self.loop.call_soon(self._async_start_events)
 
         # Start listening for requests
         logger.debug("Starting server.")
@@ -339,6 +340,10 @@ class AccessoryDriver:
         self.add_job(self.accessory.run)
         logger.debug("AccessoryDriver started successfully")
 
+    def _async_start_events(self):
+        """Start processing the events queue."""
+        self._events_task = asyncio.create_task(self.async_send_events())
+
     def stop(self):
         """Method to stop pyhap."""
         self.loop.call_soon_threadsafe(self.loop.create_task, self.async_stop())
@@ -346,42 +351,40 @@ class AccessoryDriver:
     async def async_stop(self):
         """Stops the AccessoryDriver and shutdown all remaining tasks."""
         await self.async_add_job(self._do_stop)
-        # Executor=None means a loop wasn't passed in
-        if self.executor is not None:
-            logger.debug("Shutdown executors")
-            self.executor.shutdown()
-            self.loop.stop()
-        logger.debug("Stop completed")
+        logger.debug("Stopping HAP server and event sending")
 
-    def _do_stop(self):
-        """Stop the accessory.
+        self.aio_stop_event.set()
 
-        1. Set the run sentinel.
-        2. Call the stop method of the Accessory and wait for its thread to finish.
-        3. Stop mDNS advertising.
-        4. Stop HAP server.
-        """
-        # TODO: This should happen in a different order - mDNS, server, accessory. Need
-        # to ensure that sending with a closed server will not crash the app.
+        await self.http_server.async_stop()
+
+        self._events_task.cancel()
+
         logger.info(
             "Stopping accessory %s on address %s, port %s.",
             self.accessory.display_name,
             self.state.address,
             self.state.port,
         )
-        logger.debug("Setting stop events, stopping accessory and event sending")
+        await self.async_add_job(self.accessory.stop)
+
+        logger.debug("AccessoryDriver stopped successfully")
+
+        # Executor=None means a loop wasn't passed in
+        if self.executor is not None:
+            logger.debug("Shutdown executors")
+            self.executor.shutdown()
+            self.loop.stop()
+
+        logger.debug("Stop completed")
+
+    def _do_stop(self):
+        """Stop the mDNS and set the stop event."""
+        logger.debug("Setting stop events, stopping accessory")
         self.stop_event.set()
-        self.loop.call_soon_threadsafe(self.aio_stop_event.set)
-        self.add_job(self.accessory.stop)
 
         logger.debug("Stopping mDNS advertising")
         self.advertiser.unregister_service(self.mdns_service_info)
         self.advertiser.close()
-
-        logger.debug("Stopping HAP server")
-        self.add_job(self.http_server.stop)
-
-        logger.debug("AccessoryDriver stopped successfully")
 
     def add_job(self, target, *args):
         """Add job to executor pool."""
@@ -404,17 +407,6 @@ class AccessoryDriver:
             task = self.loop.run_in_executor(None, target, *args)
 
         return task
-
-    @callback
-    def async_run_job(self, target, *args):
-        """Run job from within the event loop.
-
-        In contract to `async_add_job`, `callbacks` get called immediately.
-        """
-        if not asyncio.iscoroutine(target) and is_callback(target):
-            target(*args)
-        else:
-            self.async_add_job(target, *args)
 
     def add_accessory(self, accessory):
         """Add top level accessory to driver."""
@@ -475,7 +467,17 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        asyncio.create_task(self.event_queue.put((topic, bytedata, sender_client_addr)))
+        self.add_task(self.event_queue.put((topic, bytedata, sender_client_addr)))
+
+    def add_task(self, coro):
+        """Add a task to be run in the main loop."""
+        if threading.current_thread() == self.tid:
+            asyncio.create_task(coro)
+            return
+
+        self.loop.call_soon_threadsafe(
+            functools.partial(asyncio.create_task, coro, loop=self.loop)
+        )
 
     async def async_send_events(self):
         """Start sending events from the queue to clients.
@@ -524,8 +526,7 @@ class AccessoryDriver:
                     )
                     # Maybe consider removing the client_addr from every topic?
                     self.subscribe_client_topic(client_addr, topic, False)
-            if hasattr(self.event_queue, "task_done"):
-                self.event_queue.task_done()  # pylint: disable=no-member
+            self.event_queue.task_done()
             self.sent_events += 1
             self.accumulated_qsize += self.event_queue.qsize()
 

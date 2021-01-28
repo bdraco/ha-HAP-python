@@ -993,7 +993,7 @@ class HAPServer:
         )
         self._serve_task = asyncio.create_task(self.server.serve_forever())
 
-    def stop(self):
+    async def async_stop(self):
         """Stop the server."""
         self.server.close()
         for hap_server_protocol in list(self.connections.values()):
