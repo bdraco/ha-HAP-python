@@ -24,6 +24,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 
 REQUIRES = [
+    'h11',
     'curve25519-donna',
     'ed25519',
     'cryptography',

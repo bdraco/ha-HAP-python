@@ -32,9 +32,12 @@ backend = default_backend()
 
 
 class HAPResponse:
+    """A response to a HAP HTTP request."""
+
     def __init__(self):
-        self.status_code: int = 500
-        self.reason: str = "Internal Server Error"
+        """Create an empty response."""
+        self.status_code = 500
+        self.reason = "Internal Server Error"
         self.headers = []
         self.body = []
         self.shared_key = None
@@ -127,9 +130,7 @@ class HAPServerHandler:
             "/accessories": "handle_accessories",
             "/characteristics": "handle_get_characteristics",
         },
-        "PUT": {
-            "/characteristics": "handle_set_characteristics",
-        },
+        "PUT": {"/characteristics": "handle_set_characteristics",},
     }
 
     PAIRING_RESPONSE_TYPE = "application/pairing+tlv8"
@@ -932,9 +933,7 @@ class HAPServerProtocol(asyncio.Protocol):
     def _handle_invalid_conn_state(self, message):
         """Log invalid state and close."""
         logger.debug(
-            "%s: Invalid state: %s: close the client socket",
-            message,
-            self.peername,
+            "%s: Invalid state: %s: close the client socket", message, self.peername,
         )
         self.close()
         return False
