@@ -206,7 +206,7 @@ class HAPServerHandler:
         response code.
         Does not add Server or Date
         """
-        self.response.status_code = code
+        self.response.status_code = int(code)
         self.response.reason = message or "OK"
 
     def send_header(self, header, value):
