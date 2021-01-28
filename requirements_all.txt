@@ -1,4 +1,3 @@
-h11
 base36
 curve25519-donna
 ed25519
