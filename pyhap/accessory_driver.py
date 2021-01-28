@@ -501,14 +501,6 @@ class AccessoryDriver:
         self.advertiser.update_service(self.mdns_service_info)
 
     def persist(self):
-        """Saves the state of the accessory."""
-        if threading.current_thread() == self.tid:
-            self.add_job(self._persist)
-            return
-
-        self._persist()
-
-    def _persist(self):
         """Saves the state of the accessory.
 
         Must run in executor.
