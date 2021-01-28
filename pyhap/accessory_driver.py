@@ -25,7 +25,6 @@ import os
 import socket
 import sys
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 from zeroconf import ServiceInfo, Zeroconf
@@ -211,10 +210,11 @@ class AccessoryDriver:
 
             self.executor = ThreadPoolExecutor(**executor_opts)
             loop.set_default_executor(self.executor)
+            self.tid = threading.current_thread()
         else:
+            self.tid = threading.main_thread()
             self.executor = None
 
-        self.tid = threading.current_thread()
         self.loop = loop
 
         self.accessory = None
@@ -478,10 +478,10 @@ class AccessoryDriver:
                     "Could not send event to %s, probably stale socket.",
                     client_addr,
                 )
-                unsubs.append((client_addr, topic))
+                unsubs.append(client_addr)
                 # Maybe consider removing the client_addr from every topic?
 
-        for client_addr, topic in unsubs:
+        for client_addr in unsubs:
             self.async_subscribe_client_topic(client_addr, topic, False)
 
     def config_changed(self):
@@ -497,20 +497,32 @@ class AccessoryDriver:
 
     def update_advertisement(self):
         """Updates the mDNS service info for the accessory."""
-        self.advertiser.unregister_service(self.mdns_service_info)
         self.mdns_service_info = AccessoryMDNSServiceInfo(self.accessory, self.state)
-        time.sleep(0.1)  # Doing it right away can cause crashes.
-        self.advertiser.register_service(self.mdns_service_info)
+        self.advertiser.update_service(self.mdns_service_info)
 
     def persist(self):
         """Saves the state of the accessory."""
-        with open(self.persist_file, "w") as fp:
-            self.encoder.persist(fp, self.state)
+        if threading.current_thread() == self.tid:
+            self.add_job(self._persist)
+            return
+
+        self._persist()
+
+    def _persist(self):
+        """Saves the state of the accessory.
+
+        Must run in executor.
+        """
+        with open(self.persist_file, "w") as file_handle:
+            self.encoder.persist(file_handle, self.state)
 
     def load(self):
-        """ """
-        with open(self.persist_file, "r") as fp:
-            self.encoder.load_into(fp, self.state)
+        """Load the persist file.
+
+        Must run in executor.
+        """
+        with open(self.persist_file, "r") as file_handle:
+            self.encoder.load_into(file_handle, self.state)
 
     def pair(self, client_uuid, client_public):
         """Called when a client has paired with the accessory.
