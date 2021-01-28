@@ -5,24 +5,24 @@ The HAPServerHandler manages the state of the connection and handles incoming re
 The HAPSocket is a socket implementation that manages the "TLS" of the connection.
 """
 import asyncio
+from http import HTTPStatus
 import json
 import logging
 import struct
-import uuid
-from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
+import uuid
 
-import curve25519
-import ed25519
-import h11
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.exceptions import InvalidTag
+import curve25519
+import ed25519
+import h11
 
-import pyhap.tlv as tlv
 from pyhap.const import __version__
+import pyhap.tlv as tlv
 from pyhap.util import long_to_bytes
 
 SNAPSHOT_TIMEOUT = 10
