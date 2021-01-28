@@ -736,7 +736,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.out_cipher = None
         self.in_cipher = None
 
-        self.curr_encrypted = b""  # Encrypted buffer
+        self._incoming_buffer = bytearray()  # Encrypted buffer
 
     def _set_ciphers(self) -> None:
         """Generate out/inbound encryption keys and initialise respective ciphers."""
@@ -756,35 +756,39 @@ class HAPServerProtocol(asyncio.Protocol):
 
         # If we do not have a partial decrypted block
         # read the next one
-        while len(self.curr_encrypted) > self.LENGTH_LENGTH:
-            block_length_bytes = self.curr_encrypted[: self.LENGTH_LENGTH]
+        while len(self._incoming_buffer) > self.LENGTH_LENGTH:
+            block_length_bytes = self._incoming_buffer[: self.LENGTH_LENGTH]
             block_size = struct.unpack("H", block_length_bytes)[0]
-            data_size = self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
+            block_size_with_length = (
+                self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
+            )
 
-            if len(self.curr_encrypted) >= data_size:
+            if len(self._incoming_buffer) >= block_size_with_length:
+
+                # Trim off the length
+                del self._incoming_buffer[: self.LENGTH_LENGTH]
+
+                data_size = block_size + HAP_CRYPTO.TAG_LENGTH
                 nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
-                crypted_block = bytes(
-                    self.curr_encrypted[
-                        self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
-                    ]
-                )
+
                 try:
                     result += self.in_cipher.decrypt(
                         nonce,
-                        crypted_block,
-                        block_length_bytes,
+                        bytes(self._incoming_buffer[:data_size]),
+                        bytes(block_length_bytes),
                     )
                 except InvalidTag:
                     logger.debug(
-                        "%s: Decrypt failed, closing connection: %s",
+                        "%s: Decrypt failed, closing connection",
                         self.peername,
-                        crypted_block,
                     )
                     self.close()
                     return result
 
                 self.in_count += 1
-                self.curr_encrypted = self.curr_encrypted[data_size:]
+
+                # Now trim out the decrypted data
+                del self._incoming_buffer[:data_size]
             else:
                 return result
 
@@ -861,7 +865,7 @@ class HAPServerProtocol(asyncio.Protocol):
     def data_received(self, data: bytes) -> None:
         """Process new data from the socket."""
         if self.shared_key:
-            self.curr_encrypted += data
+            self._incoming_buffer += data
             unencrypted_data = self.decrypt_buffer()
             if unencrypted_data == b"":
                 logger.debug("No decryptable data")
