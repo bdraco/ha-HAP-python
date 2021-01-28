@@ -1008,7 +1008,8 @@ class HAPServer:
         """Stop the server."""
         self.server.close()
         for hap_server_protocol in list(self.connections.values()):
-            hap_server_protocol.close()
+            if hap_server_protocol:
+                hap_server_protocol.close()
         self.connections.clear()
         self._serve_task.cancel()
 
