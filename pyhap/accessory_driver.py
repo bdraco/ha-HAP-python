@@ -11,15 +11,9 @@ then add some more information and eventually the value change will reach the
 AccessoryDriver (all this happens through the publish() interface). The AccessoryDriver
 will then check if there is a client that subscribed for events from this exact
 Characteristic from this exact Accessory (remember, it could be a Bridge with more than
-one Accessory in it). If so, the event is put in a FIFO queue - the event queue. This
+one Accessory in it). If so, a task is created to send the event to the subscribers. This
 terminates the call chain and concludes the publishing process from the Characteristic,
 the Characteristic does not block waiting for the actual send to happen.
-
-When the AccessoryDriver is started, it spawns an event task. The purpose of
-this tasks is to get events from the event queue and send them to subscribed clients.
-Whenever a send fails, the client is unsubscripted, as it is assumed that the client left
-or went to sleep before telling us. This concludes the publishing process from the
-AccessoryDriver.
 """
 import asyncio
 import base64
@@ -143,10 +137,6 @@ class AccessoryDriver:
     to events from the HAPServer.
     """
 
-    NUM_EVENTS_BEFORE_STATS = 100
-    """Number of HAP send events to be processed before reporting statistics on
-    the event queue length."""
-
     def __init__(
         self,
         *,
@@ -240,9 +230,6 @@ class AccessoryDriver:
         self.loader = loader or Loader()
         self.aio_stop_event = asyncio.Event(loop=loop)
         self.stop_event = threading.Event()
-        self.event_queue = asyncio.Queue(loop=loop)
-        self.sent_events = 0
-        self.accumulated_qsize = 0
 
         self.safe_mode = False
 
@@ -310,10 +297,6 @@ class AccessoryDriver:
             self.state.port,
         )
 
-        # Start sending events to clients.
-        logger.debug("Starting event queue.")
-        self.loop.call_soon(self._async_start_events)
-
         # Start listening for requests
         logger.debug("Starting server.")
         self.add_job(self.http_server.async_start)
@@ -332,10 +315,6 @@ class AccessoryDriver:
         self.add_job(self.accessory.run)
         logger.debug("AccessoryDriver started successfully")
 
-    def _async_start_events(self):
-        """Start processing the events queue."""
-        self._events_task = asyncio.create_task(self.async_send_events())
-
     def stop(self):
         """Method to stop pyhap."""
         self.loop.call_soon_threadsafe(self.loop.create_task, self.async_stop())
@@ -348,8 +327,6 @@ class AccessoryDriver:
         self.aio_stop_event.set()
 
         await self.http_server.async_stop()
-
-        self._events_task.cancel()
 
         logger.info(
             "Stopping accessory %s on address %s, port %s.",
@@ -436,13 +413,14 @@ class AccessoryDriver:
                 subscribed_clients = set()
                 self.topics[topic] = subscribed_clients
             subscribed_clients.add(client)
-        else:
-            if topic not in self.topics:
-                return
-            subscribed_clients = self.topics[topic]
-            subscribed_clients.discard(client)
-            if not subscribed_clients:
-                del self.topics[topic]
+            return
+
+        if topic not in self.topics:
+            return
+        subscribed_clients = self.topics[topic]
+        subscribed_clients.discard(client)
+        if not subscribed_clients:
+            del self.topics[topic]
 
     def publish(self, data, sender_client_addr=None):
         """Publishes an event to the client.
@@ -460,77 +438,51 @@ class AccessoryDriver:
 
         data = {HAP_REPR_CHARS: [data]}
         bytedata = json.dumps(data).encode()
-        self.add_task(self.event_queue.put((topic, bytedata, sender_client_addr)))
 
-    def add_task(self, coro):
-        """Add a task to be run in the main loop."""
         if threading.current_thread() == self.tid:
-            asyncio.create_task(coro)
+            self.async_send_event(topic, bytedata, sender_client_addr)
             return
 
         self.loop.call_soon_threadsafe(
-            functools.partial(asyncio.create_task, coro, loop=self.loop)
+            self.async_send_event, topic, bytedata, sender_client_addr
         )
 
-    async def async_send_events(self):
-        """Start sending events from the queue to clients.
+    def async_send_event(self, topic, bytedata, sender_client_addr):
+        """Send an event to a client.
 
-        This continues until self.run_sentinel is set. The method logs the average
-        queue size for the past NUM_EVENTS_BEFORE_STATS. Enable debug logging to see this
-        information.
-
-        Whenever sending an event fails (i.e. HAPServer.push_event returns False), the
-        intended client is removed from the set of subscribed clients for the topic.
-
-        @note: This method blocks on Queue.get, waiting for something to come. Thus, if
-        this is not run in a daemon thread or it is run on the main thread, the app will
-        hang.
+        Must be called in the event loop
         """
-        while not self.loop.is_closed() and not self.aio_stop_event.is_set():
-            # Maybe consider having a pool of worker threads, each performing a send in
-            # order to increase throughput.
-            #
-            # Clients that made the characteristic change are NOT susposed to get events
-            # about the characteristic change as it can cause an HTTP disconnect and violates
-            # the HAP spec
-            #
-            topic, bytedata, sender_client_addr = await self.event_queue.get()
-            subscribed_clients = self.topics.get(topic, [])
-            logger.debug(
-                "Send event: topic(%s), data(%s), sender_client_addr(%s)",
-                topic,
-                bytedata,
-                sender_client_addr,
-            )
-            for client_addr in subscribed_clients.copy():
-                if sender_client_addr and sender_client_addr == client_addr:
-                    logger.debug(
-                        "Skip sending event to client since "
-                        "its the client that made the characteristic change: %s",
-                        client_addr,
-                    )
-                    continue
-                logger.debug("Sending event to client: %s", client_addr)
-                pushed = self.http_server.push_event(bytedata, client_addr)
-                if not pushed:
-                    logger.debug(
-                        "Could not send event to %s, probably stale socket.",
-                        client_addr,
-                    )
-                    # Maybe consider removing the client_addr from every topic?
-                    self.async_subscribe_client_topic(client_addr, topic, False)
-            self.event_queue.task_done()
-            self.sent_events += 1
-            self.accumulated_qsize += self.event_queue.qsize()
+        if self.aio_stop_event.is_set():
+            return
 
-            if self.sent_events > self.NUM_EVENTS_BEFORE_STATS:
+        subscribed_clients = self.topics.get(topic, [])
+        logger.debug(
+            "Send event: topic(%s), data(%s), sender_client_addr(%s)",
+            topic,
+            bytedata,
+            sender_client_addr,
+        )
+        unsubs = []
+        for client_addr in subscribed_clients:
+            if sender_client_addr and sender_client_addr == client_addr:
                 logger.debug(
-                    "Average queue size for the past %s events: %.2f",
-                    self.sent_events,
-                    self.accumulated_qsize / self.sent_events,
+                    "Skip sending event to client since "
+                    "its the client that made the characteristic change: %s",
+                    client_addr,
                 )
-                self.sent_events = 0
-                self.accumulated_qsize = 0
+                continue
+            logger.debug("Sending event to client: %s", client_addr)
+            pushed = self.http_server.push_event(bytedata, client_addr)
+            if not pushed:
+                logger.debug(
+                    "Could not send event to %s, probably stale socket.",
+                    client_addr,
+                )
+                unsubs.append((client_addr, topic))
+                # Maybe consider removing the client_addr from every topic?
+
+        for client_addr, topic in unsubs:
+            self.async_subscribe_client_topic(client_addr, topic, False)
 
     def config_changed(self):
         """Notify the driver that the accessory's configuration has changed.
