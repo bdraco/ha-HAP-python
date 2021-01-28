@@ -15,8 +15,8 @@ one Accessory in it). If so, the event is put in a FIFO queue - the event queue.
 terminates the call chain and concludes the publishing process from the Characteristic,
 the Characteristic does not block waiting for the actual send to happen.
 
-When the AccessoryDriver is started, it spawns an event dispatch thread. The purpose of
-this thread is to get events from the event queue and send them to subscribed clients.
+When the AccessoryDriver is started, it spawns an event task. The purpose of
+this tasks is to get events from the event queue and send them to subscribed clients.
 Whenever a send fails, the client is unsubscripted, as it is assumed that the client left
 or went to sleep before telling us. This concludes the publishing process from the
 AccessoryDriver.
@@ -28,7 +28,6 @@ import hashlib
 import json
 import logging
 import os
-import queue
 import socket
 import sys
 import threading
@@ -238,7 +237,6 @@ class AccessoryDriver:
         self.persist_file = os.path.expanduser(persist_file)
         self.encoder = encoder or AccessoryEncoder()
         self.topics = {}  # topic: set of (address, port) of subscribed clients
-        self.topic_lock = threading.Lock()  # for exclusive access to the topics
         self.loader = loader or Loader()
         self.aio_stop_event = asyncio.Event(loop=loop)
         self.stop_event = threading.Event()
@@ -312,14 +310,8 @@ class AccessoryDriver:
             self.state.port,
         )
 
-        # Start sending events to clients. This is done in a daemon thread, because:
-        # - if the queue is blocked waiting on an empty queue, then there is nothing left
-        #   for clean up.
-        # - if the queue is currently sending an event to the client, then, when it has
-        #   finished, it will check the run sentinel, see that it is set and break the
-        #   loop. Alternatively, the server's server_close method will shutdown and close
-        #   the socket, while sending is in progress, which will result abort the sending.
-        logger.debug("Starting event thread.")
+        # Start sending events to clients.
+        logger.debug("Starting event queue.")
         self.loop.call_soon(self._async_start_events)
 
         # Start listening for requests
@@ -422,8 +414,10 @@ class AccessoryDriver:
             logger.info("Storing Accessory state in `%s`", self.persist_file)
             self.persist()
 
-    def subscribe_client_topic(self, client, topic, subscribe=True):
-        """(Un)Subscribe the given client from the given topic, thread-safe.
+    def async_subscribe_client_topic(self, client, topic, subscribe=True):
+        """(Un)Subscribe the given client from the given topic.
+
+        This method must be run in the event loop.
 
         :param client: A client (address, port) tuple that should be subscribed.
         :type client: tuple <str, int>
@@ -436,20 +430,19 @@ class AccessoryDriver:
             do nothing.
         :type subscribe: bool
         """
-        with self.topic_lock:
-            if subscribe:
-                subscribed_clients = self.topics.get(topic)
-                if subscribed_clients is None:
-                    subscribed_clients = set()
-                    self.topics[topic] = subscribed_clients
-                subscribed_clients.add(client)
-            else:
-                if topic not in self.topics:
-                    return
-                subscribed_clients = self.topics[topic]
-                subscribed_clients.discard(client)
-                if not subscribed_clients:
-                    del self.topics[topic]
+        if subscribe:
+            subscribed_clients = self.topics.get(topic)
+            if subscribed_clients is None:
+                subscribed_clients = set()
+                self.topics[topic] = subscribed_clients
+            subscribed_clients.add(client)
+        else:
+            if topic not in self.topics:
+                return
+            subscribed_clients = self.topics[topic]
+            subscribed_clients.discard(client)
+            if not subscribed_clients:
+                del self.topics[topic]
 
     def publish(self, data, sender_client_addr=None):
         """Publishes an event to the client.
@@ -525,7 +518,7 @@ class AccessoryDriver:
                         client_addr,
                     )
                     # Maybe consider removing the client_addr from every topic?
-                    self.subscribe_client_topic(client_addr, topic, False)
+                    self.async_subscribe_client_topic(client_addr, topic, False)
             self.event_queue.task_done()
             self.sent_events += 1
             self.accumulated_qsize += self.event_queue.qsize()
@@ -744,7 +737,7 @@ class AccessoryDriver:
                 logger.debug(
                     "Subscribed client %s to topic %s", client_addr, char_topic
                 )
-                self.subscribe_client_topic(
+                self.async_subscribe_client_topic(
                     client_addr, char_topic, cq[HAP_PERMISSION_NOTIFY]
                 )
 
