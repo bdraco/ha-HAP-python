@@ -19,6 +19,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.exceptions import InvalidTag
 
 import pyhap.tlv as tlv
 from pyhap.const import __version__
@@ -760,20 +761,28 @@ class HAPServerProtocol(asyncio.Protocol):
             block_size = struct.unpack("H", block_length_bytes)[0]
             data_size = self.LENGTH_LENGTH + block_size + HAP_CRYPTO.TAG_LENGTH
 
-            if len(self.curr_encrypted) < data_size:
-                return result
-
             if len(self.curr_encrypted) >= data_size:
                 nonce = _pad_tls_nonce(struct.pack("Q", self.in_count))
-                result += self.in_cipher.decrypt(
-                    nonce,
-                    bytes(
-                        self.curr_encrypted[
-                            self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
-                        ]
-                    ),
-                    block_length_bytes,
+                crypted_block = bytes(
+                    self.curr_encrypted[
+                        self.LENGTH_LENGTH : self.LENGTH_LENGTH + data_size
+                    ]
                 )
+                try:
+                    result += self.in_cipher.decrypt(
+                        nonce,
+                        crypted_block,
+                        block_length_bytes,
+                    )
+                except InvalidTag:
+                    logger.debug(
+                        "%s: Decrypt failed, closing connection: %s",
+                        self.peername,
+                        crypted_block,
+                    )
+                    self.close()
+                    return result
+
                 self.in_count += 1
                 self.curr_encrypted = self.curr_encrypted[data_size:]
             else:
