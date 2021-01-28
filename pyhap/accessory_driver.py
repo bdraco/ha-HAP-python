@@ -326,7 +326,7 @@ class AccessoryDriver:
 
         self.aio_stop_event.set()
 
-        await self.http_server.async_stop()
+        self.http_server.async_stop()
 
         logger.info(
             "Stopping accessory %s on address %s, port %s.",
