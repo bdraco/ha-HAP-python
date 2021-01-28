@@ -17,6 +17,7 @@ the Characteristic does not block waiting for the actual send to happen.
 """
 import asyncio
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import functools
 import hashlib
 import json
@@ -25,7 +26,6 @@ import os
 import socket
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor
 
 from zeroconf import ServiceInfo, Zeroconf
 
@@ -475,8 +475,7 @@ class AccessoryDriver:
             pushed = self.http_server.push_event(bytedata, client_addr)
             if not pushed:
                 logger.debug(
-                    "Could not send event to %s, probably stale socket.",
-                    client_addr,
+                    "Could not send event to %s, probably stale socket.", client_addr,
                 )
                 unsubs.append(client_addr)
                 # Maybe consider removing the client_addr from every topic?

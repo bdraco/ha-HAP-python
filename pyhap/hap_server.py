@@ -780,8 +780,7 @@ class HAPServerProtocol(asyncio.Protocol):
                     )
                 except InvalidTag:
                     logger.debug(
-                        "%s: Decrypt failed, closing connection",
-                        self.peername,
+                        "%s: Decrypt failed, closing connection", self.peername,
                     )
                     self.close()
                     return result
