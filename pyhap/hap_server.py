@@ -617,8 +617,8 @@ class HAPServerHandler:
             self.accessory_handler.set_characteristics(
                 requested_chars, self.client_address
             )
-        except Exception as e:  # pylint: disable=broad-except
-            logger.exception("Exception in set_characteristics: %s", e)
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.exception("Exception in set_characteristics: %s", ex)
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.end_response(b"")
         else:
@@ -706,15 +706,6 @@ class HAPServerHandler:
         self.send_header("Content-Type", "image/jpeg")
         self.response.task = task
 
-    async def async_get_snapshot(self, image_size):
-        loop = asyncio.get_event_loop()
-        return await asyncio.wait_for(
-            loop.run_in_executor(
-                None, self.accessory_handler.accessory.get_snapshot, image_size
-            ),
-            SNAPSHOT_TIMEOUT,
-        )
-
 
 class HAPServerProtocol(asyncio.Protocol):
     """A asyncio.Protocol implementing the HAP protocol."""
@@ -733,6 +724,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.accessory_handler = accessory_handler
         self.hap_server_handler = None
         self.peername = None
+        self.transport = None
 
         self.request = None
         self.response = None
@@ -795,6 +787,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.close()
 
     def connection_made(self, transport: asyncio.Transport) -> None:
+        """Handle incoming connection."""
         peername = transport.get_extra_info("peername")
         logger.info("%s: Connection made", peername)
         self.transport = transport
@@ -803,6 +796,7 @@ class HAPServerProtocol(asyncio.Protocol):
         self.hap_server_handler = HAPServerHandler(self.accessory_handler, peername)
 
     def write(self, data: bytes) -> None:
+        """Write data to the client."""
         if self.shared_key:
             self._write_encrypted(data)
         else:
@@ -881,10 +875,10 @@ class HAPServerProtocol(asyncio.Protocol):
         if self.conn.our_state is h11.MUST_CLOSE:
             return self._handle_invalid_conn_state("connection state is must close")
 
-        elif event is h11.NEED_DATA:
+        if event is h11.NEED_DATA:
             return False
 
-        elif event is h11.PAUSED:
+        if event is h11.PAUSED:
             if self.request:
                 return self._handle_invalid_conn_state(
                     "paused when a request is in progress"
@@ -892,25 +886,31 @@ class HAPServerProtocol(asyncio.Protocol):
             self.conn.start_next_cycle()
             return True
 
-        elif type(event) is h11.Request:
+        if isinstance(event, h11.Request):
             self.request = event
 
             if event.method in {b"PUT", b"POST"}:
                 return True
 
-            elif event.method == b"GET":
+            if event.method == b"GET":
                 return self._process_response(
                     self.hap_server_handler.dispatch(self.request)
                 )
 
-        elif type(event) is h11.Data:
+            return self._handle_invalid_conn_state(
+                "No handler for method {}".format(event.method.decode())
+            )
+
+        if isinstance(event, h11.Data):
             return self._process_response(
                 self.hap_server_handler.dispatch(self.request, bytes(event.data))
             )
 
-        elif type(event) is h11.EndOfMessage:
+        if isinstance(event, h11.EndOfMessage):
             self.request = None
             return True
+
+        return self._handle_invalid_conn_state("Unexpected event: {}".format(event))
 
     def _process_response(self, response) -> None:
         """Process a response from the handler."""
