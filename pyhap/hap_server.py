@@ -131,7 +131,7 @@ class HAPServerHandler:
             "/accessories": "handle_accessories",
             "/characteristics": "handle_get_characteristics",
         },
-        "PUT": {"/characteristics": "handle_set_characteristics",},
+        "PUT": {"/characteristics": "handle_set_characteristics"},
     }
 
     PAIRING_RESPONSE_TYPE = "application/pairing+tlv8"
