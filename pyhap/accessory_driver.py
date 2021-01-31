@@ -373,11 +373,24 @@ class AccessoryDriver:
 
     def add_accessory(self, accessory):
         """Add top level accessory to driver."""
+        self._add_accessory(accessory)
+        self._save_or_restore_state()
+
+    async def async_add_accessory(self, accessory):
+        """Add top level accessory to driver."""
+        self._add_accessory(accessory)
+        await self.loop.run_in_executor(None, self._save_or_restore_state)
+
+    def _add_accessory(self, accessory):
+        """Add top level accessory to driver."""
         self.accessory = accessory
         if accessory.aid is None:
             accessory.aid = STANDALONE_AID
         elif accessory.aid != STANDALONE_AID:
             raise ValueError("Top-level accessory must have the AID == 1.")
+
+    def _save_or_restore_state(self):
+        """Save or restore accessory state."""
         if os.path.exists(self.persist_file):
             logger.info("Loading Accessory state from `%s`", self.persist_file)
             self.load()
