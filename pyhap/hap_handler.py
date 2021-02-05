@@ -524,7 +524,7 @@ class HAPServerHandler:
             logger.error(
                 "%s: Client %s attempted pair verify without being paired to %s first.",
                 self.client_address,
-                self.accessory_driver.accessory.display_name,
+                self.accessory_handler.accessory.display_name,
                 client_uuid,
             )
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M4)
