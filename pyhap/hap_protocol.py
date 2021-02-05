@@ -34,13 +34,22 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc: Exception) -> None:
         """Handle connection lost."""
-        logger.debug("%s: Connection lost to %s: %s", self.peername, self.accessory_driver.accessory.display_name, exc)
+        logger.debug(
+            "%s: Connection lost to %s: %s",
+            self.peername,
+            self.accessory_driver.accessory.display_name,
+            exc,
+        )
         self.close()
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         """Handle incoming connection."""
         peername = transport.get_extra_info("peername")
-        logger.info("%s: Connection made to %s", peername, self.accessory_driver.accessory.display_name)
+        logger.info(
+            "%s: Connection made to %s",
+            peername,
+            self.accessory_driver.accessory.display_name,
+        )
         self.transport = transport
         self.peername = peername
         self.connections[peername] = self
