@@ -3,10 +3,10 @@ import pytest
 
 from pyhap.accessory import Accessory, Bridge
 from pyhap.const import (
-    STANDALONE_AID,
     CATEGORY_CAMERA,
-    CATEGORY_TELEVISION,
     CATEGORY_TARGET_CONTROLLER,
+    CATEGORY_TELEVISION,
+    STANDALONE_AID,
 )
 from pyhap.state import State
 

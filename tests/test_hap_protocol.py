@@ -37,6 +37,7 @@ def test_connection_management(driver):
     addr_info = ("1.2.3.4", 5)
     transport = MagicMock(get_extra_info=Mock(return_value=addr_info))
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
@@ -57,6 +58,7 @@ def test_pair_setup(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
@@ -76,6 +78,7 @@ def test_http10_close(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
@@ -96,6 +99,7 @@ def test_pair_setup_split_between_packets(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
@@ -119,6 +123,7 @@ def test_get_accessories_without_crypto(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
@@ -137,7 +142,6 @@ def test_get_accessories_with_crypto(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
-
     driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
@@ -262,6 +266,7 @@ def test_http_11_keep_alive(driver):
     loop = MagicMock()
     transport = MagicMock()
     connections = {}
+    driver.add_accessory(Accessory(driver, "TestAcc"))
 
     hap_proto = hap_protocol.HAPServerProtocol(loop, connections, driver)
     hap_proto.connection_made(transport)
