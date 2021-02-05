@@ -610,7 +610,8 @@ class HAPServerHandler:
     def handle_pairings(self):
         """Handles a client request to update or remove a pairing."""
         if not self.is_encrypted:
-            raise UnprivilegedRequestException
+            self._send_authentication_error_tlv_response(HAP_TLV_STATES.M2)
+            return
 
         tlv_objects = tlv.decode(self.request_body)
         request_type = tlv_objects[HAP_TLV_TAGS.REQUEST_TYPE][0]
@@ -682,7 +683,7 @@ class HAPServerHandler:
         asyncio.get_event_loop().run_in_executor(
             None, self.accessory_handler.finish_pair
         )
-    
+
     def _handle_list_pairings(self, tlv_objects):
         """List current pairings."""
         logger.debug("%s: Listing pairing.", self.client_address)
