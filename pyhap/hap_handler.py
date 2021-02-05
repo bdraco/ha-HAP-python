@@ -686,7 +686,7 @@ class HAPServerHandler:
 
     def _handle_list_pairings(self, tlv_objects):
         """List current pairings."""
-        logger.debug("%s: Listing pairing.", self.client_address)
+        logger.debug("%s: list pairings", self.client_address)
         response = [HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2]
         for client_uuid, client_public in self.state.paired_clients.items():
             response.extend(
