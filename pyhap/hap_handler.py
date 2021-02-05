@@ -650,7 +650,7 @@ class HAPServerHandler:
         if not had_paired_clients:
             # Only update the announcment if this
             # is the first pairing
-            self.accessory_handler.finish_pair()
+            self._finish_pair()
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
@@ -674,8 +674,15 @@ class HAPServerHandler:
             # Only update the announcement when the last
             # client is removed, otherwise the controller
             # may not remove them all
-            self.accessory_handler.finish_pair()
+            self._finish_pair()
 
+    def _finish_pair(self):
+        """Update the mDNS announcement."""
+        logger.debug("%s: Finishing pairing")
+        asyncio.get_event_loop().run_in_executor(
+            None, self.accessory_handler.finish_pair
+        )
+    
     def _handle_list_pairings(self, tlv_objects):
         """List current pairings."""
         logger.debug("%s: Listing pairing.", self.client_address)
