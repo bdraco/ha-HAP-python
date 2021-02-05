@@ -521,7 +521,7 @@ class HAPServerHandler:
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
         perm_client_public = self.state.paired_clients.get(client_uuid)
         if perm_client_public is None:
-            logger.debug(
+            logger.error(
                 "%s: Client %s attempted pair verify without being paired to %s first.",
                 self.client_address,
                 self.accessory_driver.accessory.display_name,
