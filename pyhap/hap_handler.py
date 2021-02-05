@@ -648,6 +648,8 @@ class HAPServerHandler:
         # sees the accessory is now paired as it doesn't
         # know that it was the one doing the pairing.
         if not had_paired_clients:
+            # Only update the announcment if this
+            # is the first pairing
             self.accessory_handler.finish_pair()
 
     def _handle_remove_pairing(self, tlv_objects):
@@ -669,6 +671,9 @@ class HAPServerHandler:
         # Avoid updating the announcement until
         # after the response is sent.
         if not self.state.paired_clients and had_paired_clients:
+            # Only update the announcement when the last
+            # client is removed, otherwise the controller
+            # may not remove them all
             self.accessory_handler.finish_pair()
 
     def _handle_list_pairings(self, tlv_objects):
