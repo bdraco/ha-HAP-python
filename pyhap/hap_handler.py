@@ -653,7 +653,11 @@ class HAPServerHandler:
         logger.debug("Removing client pairing.")
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-        self.accessory_handler.unpair(client_uuid)
+
+        # If the client does not exist, we must
+        # respond with success per the spec
+        if client_uuid in self.state.paired_clients:
+            self.accessory_handler.unpair(client_uuid)
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, b"\x02")
         self.send_response(200)
