@@ -215,9 +215,9 @@ class HAPServerHandler:
         self.response = response
 
         logger.debug(
-            "Request %s from address '%s' for path '%s': %s",
-            self.command,
+            "%s: Request %s for path '%s': %s",
             self.client_address,
+            self.command,
             self.path,
             self.headers,
         )
@@ -237,7 +237,9 @@ class HAPServerHandler:
         except TimeoutException:
             self.send_response_with_status(500, HAP_SERVER_STATUS.OPERATION_TIMED_OUT)
         except Exception:  # pylint: disable=broad-except
-            logger.exception("Failed to process request for: %s", path)
+            logger.exception(
+                "%s: Failed to process request for: %s", self.client_address, path
+            )
             self.send_response_with_status(
                 500, HAP_SERVER_STATUS.SERVICE_COMMUNICATION_FAILURE
             )
@@ -271,7 +273,7 @@ class HAPServerHandler:
 
         The SRP verifier is created at this step.
         """
-        logger.debug("Pairing [1/5]")
+        logger.debug("%s: Pairing [1/5]", self.client_address)
         self.accessory_handler.setup_srp_verifier()
         salt, B = self.accessory_handler.srp_verifier.get_challenge()
 
@@ -296,7 +298,7 @@ class HAPServerHandler:
         @param tlv_objects: The TLV data received from the client.
         @type tlv_object: dict
         """
-        logger.debug("Pairing [2/5]")
+        logger.debug("%s: Pairing [2/5]", self.client_address)
         A = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         M = tlv_objects[HAP_TLV_TAGS.PASSWORD_PROOF]
         verifier = self.accessory_handler.srp_verifier
@@ -325,7 +327,7 @@ class HAPServerHandler:
         @param tlv_objects: The TLV data received from the client.
         @type tlv_object: dict
         """
-        logger.debug("Pairing [3/5]")
+        logger.debug("%s: Pairing [3/5]", self.client_address)
         encrypted_data = tlv_objects[HAP_TLV_TAGS.ENCRYPTED_DATA]
 
         session_key = self.accessory_handler.srp_verifier.get_session_key()
@@ -363,7 +365,7 @@ class HAPServerHandler:
         @param encryption_key: The encryption key for this step.
         @type encryption_key: bytes
         """
-        logger.debug("Pairing [4/5]")
+        logger.debug("%s: Pairing [4/5]", self.client_address)
         session_key = self.accessory_handler.srp_verifier.get_session_key()
         output_key = hap_hkdf(
             long_to_bytes(session_key), self.PAIRING_4_SALT, self.PAIRING_4_INFO
@@ -386,7 +388,7 @@ class HAPServerHandler:
 
         Parameters are as for _pairing_four.
         """
-        logger.debug("Pairing [5/5]")
+        logger.debug("%s: Pairing [5/5]", self.client_address)
         session_key = self.accessory_handler.srp_verifier.get_session_key()
         output_key = hap_hkdf(
             long_to_bytes(session_key), self.PAIRING_5_SALT, self.PAIRING_5_INFO
@@ -455,7 +457,7 @@ class HAPServerHandler:
         @param tlv_objects: The TLV data received from the client.
         @type tlv_object: dict
         """
-        logger.debug("Pair verify [1/2].")
+        logger.debug("%s: Pair verify [1/2].", self.client_address)
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
 
         private_key = curve25519.Private()
@@ -500,7 +502,7 @@ class HAPServerHandler:
         @param tlv_objects: The TLV data received from the client.
         @type tlv_object: dict
         """
-        logger.debug("Pair verify [2/2]")
+        logger.debug("%s: Pair verify [2/2]", self.client_address)
         encrypted_data = tlv_objects[HAP_TLV_TAGS.ENCRYPTED_DATA]
         cipher = ChaCha20Poly1305(self.enc_context["pre_session_key"])
         decrypted_data = cipher.decrypt(
@@ -520,7 +522,8 @@ class HAPServerHandler:
         perm_client_public = self.state.paired_clients.get(client_uuid)
         if perm_client_public is None:
             logger.debug(
-                "Client %s attempted pair verify without being paired first.",
+                "%s: Client %s attempted pair verify without being paired first.",
+                self.client_address,
                 client_uuid,
             )
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M4)
@@ -530,12 +533,12 @@ class HAPServerHandler:
         try:
             verifying_key.verify(dec_tlv_objects[HAP_TLV_TAGS.PROOF], material)
         except ed25519.BadSignatureError:
-            logger.error("Bad signature, abort.")
+            logger.error("%s: Bad signature, abort.", self.client_address)
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M4)
             return
 
         logger.debug(
-            "Pair verify with client '%s' completed. Switching to "
+            "%s: Pair verify with client completed. Switching to "
             "encrypted transport.",
             self.client_address,
         )
@@ -578,13 +581,15 @@ class HAPServerHandler:
         """Handles a client request to update certain characteristics."""
         if not self.is_encrypted:
             logger.warning(
-                "Attempt to access unauthorised content from %s", self.client_address
+                "%s: Attempt to access unauthorised content", self.client_address
             )
             self.send_response(HTTPStatus.UNAUTHORIZED)
             self.end_response(b"")
 
         requested_chars = json.loads(self.request_body.decode("utf-8"))
-        logger.debug("Set characteristics content: %s", requested_chars)
+        logger.debug(
+            "%s: Set characteristics content: %s", self.client_address, requested_chars
+        )
 
         # TODO: Outline how chars return errors on set_chars.
         try:
@@ -592,7 +597,9 @@ class HAPServerHandler:
                 requested_chars, self.client_address
             )
         except Exception as ex:  # pylint: disable=broad-except
-            logger.exception("Exception in set_characteristics: %s", ex)
+            logger.exception(
+                "%s: Exception in set_characteristics: %s", self.client_address, ex
+            )
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.end_response(b"")
         else:
@@ -619,7 +626,7 @@ class HAPServerHandler:
 
     def _handle_add_pairing(self, tlv_objects):
         """Update client information."""
-        logger.debug("Adding client pairing.")
+        logger.debug("%s: Adding client pairing.", self.client_address)
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
@@ -646,7 +653,7 @@ class HAPServerHandler:
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
-        logger.debug("Removing client pairing.")
+        logger.debug("%s: Removing client pairing.", self.client_address)
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
         had_paired_clients = bool(self.state.paired_clients)
@@ -670,7 +677,7 @@ class HAPServerHandler:
 
     def _handle_list_pairings(self, tlv_objects):
         """List current pairings."""
-        logger.debug("Listing pairing.")
+        logger.debug("%s: Listing pairing.", self.client_address)
         response = [HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2]
         for client_uuid, client_public in self.state.paired_clients.items():
             response.extend(
