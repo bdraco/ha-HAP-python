@@ -285,10 +285,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.PUBLIC_KEY,
             long_to_bytes(B),
         )
-
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
+        self._send_tlv_pairing_response(data)
 
     def _pairing_two(self, tlv_objects):
         """Obtain the challenge from the client (A) and client's proof that it
@@ -316,9 +313,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.PASSWORD_PROOF,
             hamk,
         )
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
+        self._send_tlv_pairing_response(data)
 
     def _pairing_three(self, tlv_objects):
         """Expand the SRP session key to obtain a new key. Use it to verify and decrypt
@@ -428,9 +423,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.ENCRYPTED_DATA,
             aead_message,
         )
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(tlv_data)
+        self._send_tlv_pairing_response(tlv_data)
 
     def handle_pair_verify(self):
         """Handles arbitrary step of the pair verify process.
@@ -492,9 +485,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.PUBLIC_KEY,
             public_key.serialize(),
         )
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
+        self._send_tlv_pairing_response(data)
 
     def _pair_verify_two(self, tlv_objects):
         """Verify the client proof and upgrade to encrypted transport.
@@ -545,10 +536,7 @@ class HAPServerHandler:
         )
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M4)
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
-
+        self._send_tlv_pairing_response(data)
         self.response.shared_key = self.enc_context["shared_key"]
         self.is_encrypted = True
         del self.enc_context
@@ -639,10 +627,7 @@ class HAPServerHandler:
             return
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
-
+        self._send_tlv_pairing_response(data)
         # Avoid updating the announcement until
         # after the response is sent as homekit will
         # drop the connection and fail to pair if it
@@ -652,6 +637,8 @@ class HAPServerHandler:
             # Only update the announcment if this
             # is the first pairing
             self._finish_pair()
+        else:
+            logger.debug("%s: already paired, not updating mdns")
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
@@ -665,9 +652,7 @@ class HAPServerHandler:
             self.accessory_handler.unpair(client_uuid)
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
+        self._send_tlv_pairing_response(data)
 
         # Avoid updating the announcement until
         # after the response is sent.
@@ -676,6 +661,8 @@ class HAPServerHandler:
             # client is removed, otherwise the controller
             # may not remove them all
             self._finish_pair()
+        else:
+            logger.debug("%s: already unpaired, not updating mdns")
 
     def _finish_pair(self):
         """Update the mDNS announcement."""
@@ -701,22 +688,24 @@ class HAPServerHandler:
             )
 
         data = tlv.encode(*response)
-        self.send_response(200)
-        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(data)
+        self._send_tlv_pairing_response(data)
 
     def _send_authentication_error_tlv_response(self, sequence):
         """Send an authentication error tlv response."""
-        response = tlv.encode(
+        data = tlv.encode(
             HAP_TLV_TAGS.SEQUENCE_NUM,
             sequence,
             HAP_TLV_TAGS.ERROR_CODE,
             HAP_TLV_ERRORS.AUTHENTICATION,
         )
+        self._send_tlv_pairing_response(data)
+        return
+
+    def _send_tlv_pairing_response(self, data):
+        """Send a TLV encoded pairing response."""
         self.send_response(200)
         self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
-        self.end_response(response)
-        return
+        self.end_response(data)
 
     def handle_resource(self):
         """Get a snapshot from the camera."""
