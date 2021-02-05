@@ -35,6 +35,12 @@ class HAPResponse:
         self.shared_key = None
         self.task = None
 
+    def __repr__(self):
+        """Return a human readable view of the response."""
+        return "<HAPResponse {} {} {} {}>".format(
+            self.status_code, self.reason, self.headers, self.body
+        )
+
 
 # Various "tag" constants for HAP's TLV encoding.
 class HAP_TLV_TAGS:
@@ -47,6 +53,7 @@ class HAP_TLV_TAGS:
     SEQUENCE_NUM = b"\x06"
     ERROR_CODE = b"\x07"
     PROOF = b"\x0A"
+    PERMISSIONS = b"\x0B"
 
 
 # Status codes for underlying HAP calls
@@ -69,6 +76,11 @@ class HAP_SERVER_STATUS:
 class HAP_OPERATION_CODE:
     INVALID_REQUEST = b"\x02"
     INVALID_SIGNATURE = b"\x04"
+
+
+class HAP_PERMISSIONS:
+    USER = b"\x00"
+    ADMIN = b"\x01"
 
 
 class TimeoutException(Exception):
@@ -604,6 +616,8 @@ class HAPServerHandler:
             self._handle_add_pairing(tlv_objects)
         elif request_type == 4:
             self._handle_remove_pairing(tlv_objects)
+        elif request_type == 5:
+            self._handle_list_pairings(tlv_objects)
         else:
             raise ValueError(
                 "Unknown pairing request type of %s during pair verify" % (request_type)
@@ -649,6 +663,27 @@ class HAPServerHandler:
         # Avoid updating the announcement until
         # after the response is sent.
         self.accessory_handler.finish_pair()
+
+    def _handle_list_pairings(self, tlv_objects):
+        """List current pairings."""
+        logger.debug("Listing pairing.")
+        response = [HAP_TLV_TAGS.SEQUENCE_NUM, b"\x02"]
+        for client_uuid, client_public in self.state.paired_clients.items():
+            response.extend(
+                [
+                    HAP_TLV_TAGS.USERNAME,
+                    str(client_uuid).encode(),
+                    HAP_TLV_TAGS.PUBLIC_KEY,
+                    client_public,
+                    HAP_TLV_TAGS.PERMISSIONS,
+                    HAP_PERMISSIONS.ADMIN,
+                ]
+            )
+
+        data = tlv.encode(*response)
+        self.send_response(200)
+        self.send_header("Content-Type", self.PAIRING_RESPONSE_TYPE)
+        self.end_response(data)
 
     def handle_resource(self):
         """Get a snapshot from the camera."""
