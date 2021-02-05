@@ -629,6 +629,7 @@ class HAPServerHandler:
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
+        had_paired_clients = bool(self.state.paired_clients)
         should_confirm = self.accessory_handler.pair(client_uuid, client_public)
         if not should_confirm:
             self.send_response_with_status(
@@ -646,14 +647,15 @@ class HAPServerHandler:
         # drop the connection and fail to pair if it
         # sees the accessory is now paired as it doesn't
         # know that it was the one doing the pairing.
-        self.accessory_handler.finish_pair()
+        if not had_paired_clients:
+            self.accessory_handler.finish_pair()
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
         logger.debug("Removing client pairing.")
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-
+        had_paired_clients = bool(self.state.paired_clients)
         # If the client does not exist, we must
         # respond with success per the spec
         if client_uuid in self.state.paired_clients:
@@ -666,7 +668,8 @@ class HAPServerHandler:
 
         # Avoid updating the announcement until
         # after the response is sent.
-        self.accessory_handler.finish_pair()
+        if not self.state.paired_clients and had_paired_clients:
+            self.accessory_handler.finish_pair()
 
     def _handle_list_pairings(self, tlv_objects):
         """List current pairings."""
