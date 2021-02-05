@@ -512,7 +512,7 @@ class HAPServerHandler:
             + self.enc_context["public_key"].serialize()
         )
 
-        client_uuid = uuid.UUID(str(client_username, "ascii"))
+        client_uuid = uuid.UUID(str(client_username, "utf-8"))
         perm_client_public = self.state.paired_clients.get(client_uuid)
         if perm_client_public is None:
             logger.debug(
@@ -684,7 +684,7 @@ class HAPServerHandler:
             response.extend(
                 [
                     HAP_TLV_TAGS.USERNAME,
-                    str(client_uuid).encode(),
+                    str(client_uuid, "utf-8").encode(),
                     HAP_TLV_TAGS.PUBLIC_KEY,
                     client_public,
                     HAP_TLV_TAGS.PERMISSIONS,
