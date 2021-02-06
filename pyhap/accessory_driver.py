@@ -146,7 +146,7 @@ class AccessoryDriver:
         listen_address=None,
         advertised_address=None,
         interface_choice=None,
-        zeroconf_instance=None,
+        zeroconf_instance=None
     ):
         """
         Initialize a new AccessoryDriver object.
