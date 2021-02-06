@@ -666,7 +666,7 @@ class HAPServerHandler:
 
     def _finish_pair(self):
         """Update the mDNS announcement."""
-        logger.debug("%s: Finishing pairing")
+        logger.debug("%s: Finishing pairing", self.client_address)
         loop = asyncio.get_event_loop()
         asyncio.ensure_future(
             loop.run_in_executor(None, self.accessory_handler.finish_pair)
