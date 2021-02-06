@@ -608,7 +608,7 @@ class HAPServerHandler:
         elif request_type == 4:
             self._handle_remove_pairing(tlv_objects)
         elif request_type == 5:
-            self._handle_list_pairings(tlv_objects)
+            self._handle_list_pairings()
         else:
             raise ValueError(
                 "Unknown pairing request type of %s during pair verify" % (request_type)
@@ -667,11 +667,12 @@ class HAPServerHandler:
     def _finish_pair(self):
         """Update the mDNS announcement."""
         logger.debug("%s: Finishing pairing")
-        asyncio.get_event_loop().run_in_executor(
-            None, self.accessory_handler.finish_pair
+        loop = asyncio.get_event_loop()
+        asyncio.ensure_future(
+            loop.run_in_executor(None, self.accessory_handler.finish_pair)
         )
 
-    def _handle_list_pairings(self, tlv_objects):
+    def _handle_list_pairings(self):
         """List current pairings."""
         logger.debug("%s: list pairings", self.client_address)
         response = [HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2]
@@ -692,14 +693,14 @@ class HAPServerHandler:
 
     def _send_authentication_error_tlv_response(self, sequence):
         """Send an authentication error tlv response."""
-        data = tlv.encode(
-            HAP_TLV_TAGS.SEQUENCE_NUM,
-            sequence,
-            HAP_TLV_TAGS.ERROR_CODE,
-            HAP_TLV_ERRORS.AUTHENTICATION,
+        self._send_tlv_pairing_response(
+            tlv.encode(
+                HAP_TLV_TAGS.SEQUENCE_NUM,
+                sequence,
+                HAP_TLV_TAGS.ERROR_CODE,
+                HAP_TLV_ERRORS.AUTHENTICATION,
+            )
         )
-        self._send_tlv_pairing_response(data)
-        return
 
     def _send_tlv_pairing_response(self, data):
         """Send a TLV encoded pairing response."""

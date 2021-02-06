@@ -206,7 +206,7 @@ def test_to_HAP_string():
     assert "maxLen" not in hap_repr
 
     char.value = (
-        "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeee" "ffffffffffgggggggggg"
+        "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffffgggggggggg"
     )
     with patch.object(char, "broker"):
         hap_repr = char.to_HAP()
