@@ -517,8 +517,10 @@ class AccessoryDriver:
         """
         tmp_filename = None
         try:
-            dir = os.path.dirname(self.persist_file)
-            with tempfile.NamedTemporaryFile(mode="w", dir=dir, delete=False) as file_handle:
+            temp_dir = os.path.dirname(self.persist_file)
+            with tempfile.NamedTemporaryFile(
+                mode="w", dir=temp_dir, delete=False
+            ) as file_handle:
                 tmp_filename = file_handle.name
                 self.encoder.persist(file_handle, self.state)
             os.replace(tmp_filename, self.persist_file)
