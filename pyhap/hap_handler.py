@@ -636,6 +636,7 @@ class HAPServerHandler:
         if not was_paired:
             # Only update the announcment if this
             # is the first pairing
+            logger.debug("%s: updating mdns to paired", self.client_address)
             self._finish_pair()
         else:
             logger.debug("%s: already paired, not updating mdns", self.client_address)
@@ -660,13 +661,13 @@ class HAPServerHandler:
             # Only update the announcement when the last
             # client is removed, otherwise the controller
             # may not remove them all
+            logger.debug("%s: updating mdns to unpaired", self.client_address)
             self._finish_pair()
         else:
             logger.debug("%s: already unpaired, not updating mdns", self.client_address)
 
     def _finish_pair(self):
         """Update the mDNS announcement."""
-        logger.debug("%s: Finishing pairing", self.client_address)
         loop = asyncio.get_event_loop()
         asyncio.ensure_future(
             loop.run_in_executor(None, self.accessory_handler.finish_pair)
