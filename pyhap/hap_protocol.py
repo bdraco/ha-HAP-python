@@ -156,6 +156,11 @@ class HAPServerProtocol(asyncio.Protocol):
         # If we get a shared key, upgrade to encrypted
         if response.shared_key:
             self.hap_crypto = HAPCrypto(response.shared_key)
+        # Only update mDNS after sending the response
+        if response.pairing_changed:
+            asyncio.ensure_future(
+                self.loop.run_in_executor(None, self.accessory_driver.finish_pair)
+            )
 
     def _handle_response_ready(self, task: asyncio.Task) -> None:
         """Handle delayed response."""

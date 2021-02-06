@@ -34,6 +34,7 @@ class HAPResponse:
         self.body = []
         self.shared_key = None
         self.task = None
+        self.pairing_changed = False
 
     def __repr__(self):
         """Return a human readable view of the response."""
@@ -409,7 +410,7 @@ class HAPServerHandler:
         aead_message = bytes(cipher.encrypt(self.PAIRING_5_NONCE, bytes(message), b""))
 
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-        should_confirm = self.accessory_handler.pair(client_uuid, client_ltpk)
+        should_confirm = self.accessory_handler.async_pair(client_uuid, client_ltpk)
 
         if not should_confirm:
             self.send_response_with_status(
@@ -423,6 +424,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.ENCRYPTED_DATA,
             aead_message,
         )
+        self.response.pairing_changed = True
         self._send_tlv_pairing_response(tlv_data)
 
     def handle_pair_verify(self):
@@ -620,7 +622,6 @@ class HAPServerHandler:
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-        was_paired = self.state.paired
         should_confirm = self.accessory_handler.async_pair(client_uuid, client_public)
         if not should_confirm:
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M2)
@@ -628,18 +629,6 @@ class HAPServerHandler:
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
         self._send_tlv_pairing_response(data)
-        # Avoid updating the announcement until
-        # after the response is sent as homekit will
-        # drop the connection and fail to pair if it
-        # sees the accessory is now paired as it doesn't
-        # know that it was the one doing the pairing.
-        if not was_paired:
-            # Only update the announcment if this
-            # is the first pairing
-            logger.debug("%s: updating mdns to paired", self.client_address)
-            self._finish_pair()
-        else:
-            logger.debug("%s: already paired, not updating mdns", self.client_address)
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
@@ -655,23 +644,12 @@ class HAPServerHandler:
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
         self._send_tlv_pairing_response(data)
 
-        # Avoid updating the announcement until
-        # after the response is sent.
         if not self.state.paired_clients and was_paired:
             # Only update the announcement when the last
             # client is removed, otherwise the controller
             # may not remove them all
             logger.debug("%s: updating mdns to unpaired", self.client_address)
-            self._finish_pair()
-        else:
-            logger.debug("%s: pairings remain, not updating mdns", self.client_address)
-
-    def _finish_pair(self):
-        """Update the mDNS announcement."""
-        loop = asyncio.get_event_loop()
-        asyncio.ensure_future(
-            loop.run_in_executor(None, self.accessory_handler.finish_pair)
-        )
+            self.response.pairing_changed = True
 
     def _handle_list_pairings(self):
         """List current pairings."""
