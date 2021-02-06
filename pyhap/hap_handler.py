@@ -621,7 +621,7 @@ class HAPServerHandler:
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
         was_paired = self.state.paired
-        should_confirm = self.accessory_handler.pair(client_uuid, client_public)
+        should_confirm = self.accessory_handler.async_pair(client_uuid, client_public)
         if not should_confirm:
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M2)
             return
@@ -650,7 +650,7 @@ class HAPServerHandler:
         # If the client does not exist, we must
         # respond with success per the spec
         if client_uuid in self.state.paired_clients:
-            self.accessory_handler.unpair(client_uuid)
+            self.accessory_handler.async_unpair(client_uuid)
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
         self._send_tlv_pairing_response(data)

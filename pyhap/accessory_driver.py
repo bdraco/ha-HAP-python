@@ -497,6 +497,7 @@ class AccessoryDriver:
 
     def update_advertisement(self):
         """Updates the mDNS service info for the accessory."""
+        logger.debug("Updating mDNS advertisement")
         self.mdns_service_info = AccessoryMDNSServiceInfo(self.accessory, self.state)
         self.advertiser.update_service(self.mdns_service_info)
 
