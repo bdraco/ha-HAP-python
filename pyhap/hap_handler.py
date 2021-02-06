@@ -638,7 +638,7 @@ class HAPServerHandler:
             # is the first pairing
             self._finish_pair()
         else:
-            logger.debug("%s: already paired, not updating mdns")
+            logger.debug("%s: already paired, not updating mdns", self.client_address)
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
@@ -662,7 +662,7 @@ class HAPServerHandler:
             # may not remove them all
             self._finish_pair()
         else:
-            logger.debug("%s: already unpaired, not updating mdns")
+            logger.debug("%s: already unpaired, not updating mdns", self.client_address)
 
     def _finish_pair(self):
         """Update the mDNS announcement."""
