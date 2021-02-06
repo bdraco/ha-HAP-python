@@ -664,7 +664,7 @@ class HAPServerHandler:
             logger.debug("%s: updating mdns to unpaired", self.client_address)
             self._finish_pair()
         else:
-            logger.debug("%s: already unpaired, not updating mdns", self.client_address)
+            logger.debug("%s: pairings remain, not updating mdns", self.client_address)
 
     def _finish_pair(self):
         """Update the mDNS announcement."""

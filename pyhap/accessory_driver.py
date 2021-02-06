@@ -566,7 +566,6 @@ class AccessoryDriver:
         # pairing response is sent.
         #
         if not self.safe_mode:
-            FUCK
             self.update_advertisement()
 
     def setup_srp_verifier(self):
