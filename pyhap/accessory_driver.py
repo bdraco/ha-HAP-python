@@ -144,7 +144,7 @@ class AccessoryDriver:
         listen_address=None,
         advertised_address=None,
         interface_choice=None,
-        zeroconf_instance=None
+        zeroconf_instance=None,
     ):
         """
         Initialize a new AccessoryDriver object.
@@ -305,9 +305,11 @@ class AccessoryDriver:
             self.accessory.setup_message()
 
         # Start the accessory so it can do stuff.
-        logger.debug("Starting accessory.")
+        logger.debug("Starting accessory %s", self.accessory.display_name)
         self.add_job(self.accessory.run)
-        logger.debug("AccessoryDriver started successfully")
+        logger.debug(
+            "AccessoryDriver for %s started successfully", self.accessory.display_name
+        )
 
     def stop(self):
         """Method to stop pyhap."""
@@ -330,7 +332,9 @@ class AccessoryDriver:
         )
         await self.async_add_job(self.accessory.stop)
 
-        logger.debug("AccessoryDriver stopped successfully")
+        logger.debug(
+            "AccessoryDriver for %s stopped successfully", self.accessory.display_name
+        )
 
         # Executor=None means a loop wasn't passed in
         if self.executor is not None:
@@ -345,7 +349,7 @@ class AccessoryDriver:
         logger.debug("Setting stop events, stopping accessory")
         self.stop_event.set()
 
-        logger.debug("Stopping mDNS advertising")
+        logger.debug("Stopping mDNS advertising for %s", self.accessory.display_name)
         self.advertiser.unregister_service(self.mdns_service_info)
         self.advertiser.close()
 
@@ -562,6 +566,7 @@ class AccessoryDriver:
         # pairing response is sent.
         #
         if not self.safe_mode:
+            FUCK
             self.update_advertisement()
 
     def setup_srp_verifier(self):
