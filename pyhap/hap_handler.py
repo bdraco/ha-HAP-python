@@ -622,7 +622,7 @@ class HAPServerHandler:
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-        should_confirm = self.accessory_handler.async_pair(client_uuid, client_public)
+        should_confirm = self.accessory_handler.pair(client_uuid, client_public)
         if not should_confirm:
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M2)
             return
