@@ -538,26 +538,8 @@ class AccessoryDriver:
         with open(self.persist_file, "r") as file_handle:
             self.encoder.load_into(file_handle, self.state)
 
+    @callback
     def pair(self, client_uuid, client_public):
-        """Called when a client has paired with the accessory.
-
-        Persist the new accessory state.
-
-        :param client_uuid: The client uuid.
-        :type client_uuid: uuid.UUID
-
-        :param client_public: The client's public key.
-        :type client_public: bytes
-
-        :return: Whether the pairing is successful.
-        :rtype: bool
-        """
-        logger.info("Paired with %s.", client_uuid)
-        self.state.add_paired_client(client_uuid, client_public)
-        self.persist()
-        return True
-
-    def async_pair(self, client_uuid, client_public):
         """Called when a client has paired with the accessory.
 
         Persist the new accessory state.
@@ -576,19 +558,8 @@ class AccessoryDriver:
         self.async_persist()
         return True
 
+    @callback
     def unpair(self, client_uuid):
-        """Removes the paired client from the accessory.
-
-        Persist the new accessory state.
-
-        :param client_uuid: The client uuid.
-        :type client_uuid: uuid.UUID
-        """
-        logger.info("Unpairing client %s.", client_uuid)
-        self.state.remove_paired_client(client_uuid)
-        self.persist()
-
-    def async_unpair(self, client_uuid):
         """Removes the paired client from the accessory.
 
         Persist the new accessory state.

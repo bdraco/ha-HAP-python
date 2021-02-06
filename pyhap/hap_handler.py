@@ -410,7 +410,7 @@ class HAPServerHandler:
         aead_message = bytes(cipher.encrypt(self.PAIRING_5_NONCE, bytes(message), b""))
 
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
-        should_confirm = self.accessory_handler.async_pair(client_uuid, client_ltpk)
+        should_confirm = self.accessory_handler.pair(client_uuid, client_ltpk)
 
         if not should_confirm:
             self.send_response_with_status(
@@ -639,7 +639,7 @@ class HAPServerHandler:
         # If the client does not exist, we must
         # respond with success per the spec
         if client_uuid in self.state.paired_clients:
-            self.accessory_handler.async_unpair(client_uuid)
+            self.accessory_handler.unpair(client_uuid)
 
         data = tlv.encode(HAP_TLV_TAGS.SEQUENCE_NUM, HAP_TLV_STATES.M2)
         self._send_tlv_pairing_response(data)
