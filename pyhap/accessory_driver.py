@@ -20,6 +20,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import functools
 import hashlib
+import tempfile
 import json
 import logging
 import os
@@ -48,6 +49,7 @@ from pyhap.hsrp import Server as SrpServer
 from pyhap.loader import Loader
 from pyhap.params import get_srp_context
 from pyhap.state import State
+from .util import callback
 
 logger = logging.getLogger(__name__)
 
@@ -498,13 +500,34 @@ class AccessoryDriver:
         self.mdns_service_info = AccessoryMDNSServiceInfo(self.accessory, self.state)
         self.advertiser.update_service(self.mdns_service_info)
 
+    @callback
+    def async_persist(self):
+        """Saves the state of the accessory.
+
+        Must be run in the event loop.
+        """
+        loop = asyncio.get_event_loop()
+        asyncio.ensure_future(loop.run_in_executor(None, self.persist))
+
     def persist(self):
         """Saves the state of the accessory.
 
         Must run in executor.
         """
-        with open(self.persist_file, "w") as file_handle:
-            self.encoder.persist(file_handle, self.state)
+        tmp_filename = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as file_handle:
+                tmp_filename = file_handle.name
+                self.encoder.persist(file_handle, self.state)
+            os.replace(tmp_filename, self.persist_file)
+        except OSError as error:
+            logger.error("Saving state file %s failed: %s", self.persist_file, error)
+        finally:
+            if os.path.exists(tmp_filename):
+                try:
+                    os.remove(tmp_filename)
+                except OSError:
+                    pass
 
     def load(self):
         """Load the persist file.
@@ -528,12 +551,28 @@ class AccessoryDriver:
         :return: Whether the pairing is successful.
         :rtype: bool
         """
-        # TODO: Adding a client is a change in the acc. configuration. Then, should we
-        # let the accessory call config_changed, which will persist and update mDNS?
-        # See also unpair.
         logger.info("Paired with %s.", client_uuid)
         self.state.add_paired_client(client_uuid, client_public)
         self.persist()
+        return True
+
+    def async_pair(self, client_uuid, client_public):
+        """Called when a client has paired with the accessory.
+
+        Persist the new accessory state.
+
+        :param client_uuid: The client uuid.
+        :type client_uuid: uuid.UUID
+
+        :param client_public: The client's public key.
+        :type client_public: bytes
+
+        :return: Whether the pairing is successful.
+        :rtype: bool
+        """
+        logger.info("Paired with %s.", client_uuid)
+        self.state.add_paired_client(client_uuid, client_public)
+        self.async_persist()
         return True
 
     def unpair(self, client_uuid):
@@ -547,6 +586,18 @@ class AccessoryDriver:
         logger.info("Unpairing client %s.", client_uuid)
         self.state.remove_paired_client(client_uuid)
         self.persist()
+
+    def async_unpair(self, client_uuid):
+        """Removes the paired client from the accessory.
+
+        Persist the new accessory state.
+
+        :param client_uuid: The client uuid.
+        :type client_uuid: uuid.UUID
+        """
+        logger.info("Unpairing client %s.", client_uuid)
+        self.state.remove_paired_client(client_uuid)
+        self.async_persist()
 
     def finish_pair(self):
         """Finishing pairing or unpairing.
