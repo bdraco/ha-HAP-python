@@ -35,6 +35,7 @@ from pyhap import util
 from pyhap.accessory import get_topic
 from pyhap.characteristic import CharacteristicError
 from pyhap.const import (
+    MAX_CONFIG_VERSION,
     HAP_PERMISSION_NOTIFY,
     HAP_REPR_ACCS,
     HAP_REPR_AID,
@@ -338,7 +339,11 @@ class AccessoryDriver:
             self.state.address,
             self.state.port,
         )
-        await self.async_add_job(self.accessory.stop)
+
+        if asyncio.iscoroutine(self.accessory.stop):
+            await self.accessory.stop()
+        else:
+            await self.async_add_job(self.accessory.stop)
 
         logger.debug(
             "AccessoryDriver for %s stopped successfully", self.accessory.display_name
@@ -498,6 +503,8 @@ class AccessoryDriver:
         to fetch new data.
         """
         self.state.config_version += 1
+        if self.state.config_version > MAX_CONFIG_VERSION:
+            self.state.config_version = 1
         self.persist()
         self.update_advertisement()
 
