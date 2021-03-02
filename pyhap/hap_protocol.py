@@ -13,6 +13,8 @@ from .hap_handler import HAPResponse, HAPServerHandler
 
 logger = logging.getLogger(__name__)
 
+HIGH_WRITE_BUFFER_SIZE = 2 ** 19
+
 
 class HAPServerProtocol(asyncio.Protocol):
     """A asyncio.Protocol implementing the HAP protocol."""
@@ -50,6 +52,10 @@ class HAPServerProtocol(asyncio.Protocol):
             peername,
             self.accessory_driver.accessory.display_name,
         )
+        # Ensure we do not write a partial encrypted response
+        # as it can cause the controller to send a RST and drop
+        # the connection with large responses.
+        transport.set_write_buffer_limits(high=HIGH_WRITE_BUFFER_SIZE)
         self.transport = transport
         self.peername = peername
         self.connections[peername] = self
@@ -73,6 +79,11 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""
+        body_len = len(response.body)
+        if body_len:
+            # Force Content-Length as iOS can sometimes
+            # stall if it gets chunked encoding
+            response.headers.append(("Content-Length", str(body_len)))
         self.write(
             self.conn.send(
                 h11.Response(

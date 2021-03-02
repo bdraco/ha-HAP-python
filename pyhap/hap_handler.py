@@ -239,11 +239,6 @@ class HAPServerHandler:
                 HAP_SERVER_STATUS.SERVICE_COMMUNICATION_FAILURE,
             )
 
-        body_len = len(self.response.body)
-        if body_len:
-            # Force Content-Length as iOS can sometimes
-            # stall if it gets chunked encoding
-            self.send_header("Content-Length", str(body_len))
         self.response = None
         return response
 
