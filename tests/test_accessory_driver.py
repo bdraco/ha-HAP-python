@@ -1,9 +1,9 @@
 """Tests for pyhap.accessory_driver."""
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 from unittest.mock import MagicMock, patch
 from uuid import uuid1
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
