@@ -15,7 +15,7 @@ from .hap_handler import HAPResponse, HAPServerHandler
 logger = logging.getLogger(__name__)
 
 HIGH_WRITE_BUFFER_SIZE = 2 ** 19
-IDLE_CONNECTION_TIMEOUT = 3600
+IDLE_CONNECTION_TIMEOUT = 7200
 
 
 class HAPServerProtocol(asyncio.Protocol):
