@@ -308,7 +308,7 @@ class HAPServerHandler:
         M = tlv_objects[HAP_TLV_TAGS.PASSWORD_PROOF]
         verifier = self.accessory_handler.srp_verifier
         self.accessory_handler.set_srp_a(A)
-        hamk = verifier.verify(M)
+        hamk = verifier.verify_session(M)
 
         if hamk is None:  # Probably the provided pincode was wrong.
             self._send_authentication_error_tlv_response(HAP_TLV_STATES.M4)
