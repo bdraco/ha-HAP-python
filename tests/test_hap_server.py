@@ -1,7 +1,7 @@
 """Tests for the HAPServer."""
 
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -20,6 +20,28 @@ async def test_we_can_start_stop(driver):
     await server.async_start(loop)
     server.connections[client_1_addr_info] = MagicMock()
     server.connections[client_2_addr_info] = None
+    server.async_stop()
+
+
+@pytest.mark.asyncio
+async def test_idle_connection_cleanup(driver):
+    """Test we cleanup idle connections."""
+    loop = asyncio.get_event_loop()
+    addr_info = ("0.0.0.0", None)
+    client_1_addr_info = ("1.2.3.4", 44433)
+
+    with patch.object(hap_server, "IDLE_CONNECTION_CHECK_INTERVAL", 0):
+        server = hap_server.HAPServer(addr_info, driver)
+        await server.async_start(loop)
+        check_idle = MagicMock()
+        server.connections[client_1_addr_info] = MagicMock(check_idle=check_idle)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert check_idle.called
+        check_idle.reset_mock()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert check_idle.called
     server.async_stop()
 
 
