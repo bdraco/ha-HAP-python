@@ -15,7 +15,7 @@ from .hap_handler import HAPResponse, HAPServerHandler
 logger = logging.getLogger(__name__)
 
 HIGH_WRITE_BUFFER_SIZE = 2 ** 19
-IDLE_CONNECTION_TIMEOUT = 7200
+IDLE_CONNECTION_TIMEOUT = 14400
 
 
 class HAPServerProtocol(asyncio.Protocol):
@@ -105,8 +105,11 @@ class HAPServerProtocol(asyncio.Protocol):
         """Abort when do not get any data within the timeout."""
         if self.last_activity + IDLE_CONNECTION_TIMEOUT >= now:
             return
-        logger.debug(
-            "%s: Idle time out after: %s", self.peername, IDLE_CONNECTION_TIMEOUT
+        logger.info(
+            "%s: Idle time out after %s to %s",
+            self.peername,
+            IDLE_CONNECTION_TIMEOUT,
+            self.accessory_driver.accessory.display_name,
         )
         self.close()
 
