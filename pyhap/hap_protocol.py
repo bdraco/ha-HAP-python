@@ -15,7 +15,12 @@ from .hap_handler import HAPResponse, HAPServerHandler
 logger = logging.getLogger(__name__)
 
 HIGH_WRITE_BUFFER_SIZE = 2 ** 19
-IDLE_CONNECTION_TIMEOUT = 14400
+# We timeout idle connections after 90 hours as we must
+# clean up unused sockets periodically. 90 hours was choosen
+# as its the longest time we expect a user to be away from
+# their phone or device before they have to resync when they
+# reopen homekit.
+IDLE_CONNECTION_TIMEOUT = 90 * 60 * 60
 
 
 class HAPServerProtocol(asyncio.Protocol):

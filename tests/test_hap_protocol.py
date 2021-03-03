@@ -70,6 +70,12 @@ def test_connection_management(driver):
     hap_proto.close()
     assert len(connections) == 0
 
+    hap_proto.connection_made(transport)
+    assert len(connections) == 1
+    assert connections[addr_info] == hap_proto
+    hap_proto.connection_lost(None)
+    assert len(connections) == 0
+
 
 def test_pair_setup(driver):
     """Verify an non-encrypt request."""

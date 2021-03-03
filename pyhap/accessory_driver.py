@@ -436,7 +436,7 @@ class AccessoryDriver:
 
         This method must be run in the event loop.
 
-        :param client: A client (address, port) tuple that should be subscribed.
+        :param client: A client (address, port) tuple that should be unsubscribed.
         :type client: tuple <str, int>
         """
         client_topics = []
