@@ -36,10 +36,11 @@ DUMMY_A = b"Ve\xce\xd4\x90LExKD\x9d7\x16\\@\xb6\xb8\x9f\x01\x1a]\x86\xa4\x1c"
 "\xe5\x8a\xfd\x97\x97\xcb\xb1\x15\xd5\xc2\xd7\x07\x91A\xdf\xd7"
 
 
-SRP_PARAMS = {
+SRP_VERIFY_PARAMS = {
     "hash_alg": srp.SHA512,
     "ng_type": srp.NG_CUSTOM,
     "n_hex": N_HEX,
     "g_hex": G_HEX,
-    "salt_len": SALT_LEN
 }
+
+SRP_CREATE_PARAMS = {**SRP_VERIFY_PARAMS, "salt_len": SALT_LEN}

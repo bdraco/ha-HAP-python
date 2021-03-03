@@ -49,7 +49,7 @@ from pyhap.encoder import AccessoryEncoder
 from pyhap.hap_server import HAPServer
 from pyhap.loader import Loader
 from pyhap.state import State
-from pyhap.params import SRP_PARAMS, SRP_USERNAME, DUMMY_A
+from pyhap.params import SRP_VERIFY_PARAMS, SRP_CREATE_PARAMS, SRP_USERNAME, DUMMY_A
 
 from .util import callback
 
@@ -608,10 +608,13 @@ class AccessoryDriver:
         """Create an SRP verifier for the accessory's info."""
         if self._srp_salted_verification_key is None:
             self._srp_salted_verification_key = srp.create_salted_verification_key(
-                SRP_USERNAME, self.state.pincode, **SRP_PARAMS
+                SRP_USERNAME, self.state.pincode, **SRP_CREATE_PARAMS
             )
         self.srp_verifier = srp.Verifier(
-            SRP_USERNAME, *self._srp_salted_verification_key, a or DUMMY_A, **SRP_PARAMS
+            SRP_USERNAME,
+            *self._srp_salted_verification_key,
+            a or DUMMY_A,
+            **SRP_VERIFY_PARAMS,
         )
 
     def set_srp_a(self, a):
