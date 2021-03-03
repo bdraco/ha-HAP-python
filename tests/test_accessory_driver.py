@@ -617,6 +617,10 @@ async def test_call_async_add_job_with_coroutine(driver):
         await driver.async_add_job(coro_test)
         assert called is True
 
+        called = False
+        await driver.async_add_job(coro_test())
+        assert called is True
+
 
 @pytest.mark.asyncio
 async def test_call_async_add_job_with_callback(driver):
