@@ -510,6 +510,7 @@ def test_async_subscribe_client_topic(driver):
     driver.async_subscribe_client_topic(addr_info, "invalid", False)
     assert driver.topics == {}
 
+
 def test_mdns_service_info(driver):
     """Test accessory mdns advert."""
     acc = Accessory(driver, "[@@@Test@@@] Accessory")
