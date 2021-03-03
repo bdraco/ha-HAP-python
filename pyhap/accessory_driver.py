@@ -606,6 +606,7 @@ class AccessoryDriver:
 
     def setup_srp_verifier(self, a=None, b=None):
         """Create an SRP verifier for the accessory's info."""
+        srp.rfc5054_enable()
         if self._srp_salted_verification_key is None:
             self._srp_salted_verification_key = srp.create_salted_verification_key(
                 SRP_USERNAME, self.state.pincode, **SRP_CREATE_PARAMS
