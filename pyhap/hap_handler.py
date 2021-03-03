@@ -16,7 +16,6 @@ import ed25519
 
 from pyhap.const import CATEGORY_BRIDGE
 import pyhap.tlv as tlv
-from pyhap.util import long_to_bytes
 
 from .hap_crypto import hap_hkdf, pad_tls_nonce
 
@@ -292,7 +291,7 @@ class HAPServerHandler:
             HAP_TLV_TAGS.SALT,
             salt,
             HAP_TLV_TAGS.PUBLIC_KEY,
-            long_to_bytes(B),
+            B,
         )
         self._send_tlv_pairing_response(data)
 
@@ -308,8 +307,7 @@ class HAPServerHandler:
         A = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         M = tlv_objects[HAP_TLV_TAGS.PASSWORD_PROOF]
         verifier = self.accessory_handler.srp_verifier
-        verifier.set_A(A)
-
+        self.accessory_handler.set_srp_a(A)
         hamk = verifier.verify(M)
 
         if hamk is None:  # Probably the provided pincode was wrong.
@@ -335,9 +333,7 @@ class HAPServerHandler:
         encrypted_data = tlv_objects[HAP_TLV_TAGS.ENCRYPTED_DATA]
 
         session_key = self.accessory_handler.srp_verifier.get_session_key()
-        hkdf_enc_key = hap_hkdf(
-            long_to_bytes(session_key), self.PAIRING_3_SALT, self.PAIRING_3_INFO
-        )
+        hkdf_enc_key = hap_hkdf(session_key, self.PAIRING_3_SALT, self.PAIRING_3_INFO)
 
         cipher = ChaCha20Poly1305(hkdf_enc_key)
         decrypted_data = cipher.decrypt(
@@ -371,9 +367,7 @@ class HAPServerHandler:
         """
         logger.debug("%s: Pairing [4/5]", self.client_address)
         session_key = self.accessory_handler.srp_verifier.get_session_key()
-        output_key = hap_hkdf(
-            long_to_bytes(session_key), self.PAIRING_4_SALT, self.PAIRING_4_INFO
-        )
+        output_key = hap_hkdf(session_key, self.PAIRING_4_SALT, self.PAIRING_4_INFO)
 
         data = output_key + client_username + client_ltpk
         verifying_key = ed25519.VerifyingKey(client_ltpk)
@@ -394,9 +388,7 @@ class HAPServerHandler:
         """
         logger.debug("%s: Pairing [5/5]", self.client_address)
         session_key = self.accessory_handler.srp_verifier.get_session_key()
-        output_key = hap_hkdf(
-            long_to_bytes(session_key), self.PAIRING_5_SALT, self.PAIRING_5_INFO
-        )
+        output_key = hap_hkdf(session_key, self.PAIRING_5_SALT, self.PAIRING_5_INFO)
 
         server_public = self.state.public_key.to_bytes()
         mac = self.state.mac.encode()

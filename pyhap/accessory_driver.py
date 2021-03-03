@@ -27,6 +27,7 @@ import socket
 import sys
 import tempfile
 import threading
+import srp
 
 from zeroconf import ServiceInfo, Zeroconf
 
@@ -46,10 +47,9 @@ from pyhap.const import (
 )
 from pyhap.encoder import AccessoryEncoder
 from pyhap.hap_server import HAPServer
-from pyhap.hsrp import Server as SrpServer
 from pyhap.loader import Loader
-from pyhap.params import get_srp_context
 from pyhap.state import State
+from pyhap.params import SRP_PARAMS, SRP_USERNAME, DUMMY_A
 
 from .util import callback
 
@@ -224,6 +224,7 @@ class AccessoryDriver:
 
         self.mdns_service_info = None
         self.srp_verifier = None
+        self._srp_salted_verification_key = None
 
         address = address or util.get_local_address()
         advertised_address = advertised_address or address
@@ -603,12 +604,19 @@ class AccessoryDriver:
         if not self.safe_mode:
             self.update_advertisement()
 
-    def setup_srp_verifier(self):
+    def setup_srp_verifier(self, a=None, b=None):
         """Create an SRP verifier for the accessory's info."""
-        # TODO: Move the below hard-coded values somewhere nice.
-        ctx = get_srp_context(3072, hashlib.sha512, 16)
-        verifier = SrpServer(ctx, b"Pair-Setup", self.state.pincode)
-        self.srp_verifier = verifier
+        if self._srp_salted_verification_key is None:
+            self._srp_salted_verification_key = srp.create_salted_verification_key(
+                SRP_USERNAME, self.state.pincode, **SRP_PARAMS
+            )
+        self.srp_verifier = srp.Verifier(
+            SRP_USERNAME, *self._srp_salted_verification_key, a or DUMMY_A, **SRP_PARAMS
+        )
+
+    def set_srp_a(self, a):
+        """Recreate the SRP verifier with a new A."""
+        self.setup_srp_verifier(a=a, b=self.srp_verifier.get_ephemeral_secret())
 
     def get_accessories(self):
         """Returns the accessory in HAP format.

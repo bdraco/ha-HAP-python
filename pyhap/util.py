@@ -47,28 +47,6 @@ def get_local_address():
     return addr
 
 
-def long_to_bytes(n):
-    """
-    Convert a ``long int`` to ``bytes``
-
-    :param n: Long Integer
-    :type n: int
-
-    :return: ``long int`` in ``bytes`` format.
-    :rtype: bytes
-    """
-    byteList = list()
-    x = 0
-    off = 0
-    while x != n:
-        b = (n >> off) & 0xFF
-        byteList.append(b)
-        x = x | (b << off)
-        off += 8
-    byteList.reverse()
-    return bytes(byteList)
-
-
 def generate_mac():
     """
     Generates a fake mac address used in broadcast.
