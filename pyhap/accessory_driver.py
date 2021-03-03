@@ -615,6 +615,7 @@ class AccessoryDriver:
             *self._srp_salted_verification_key,
             a or DUMMY_A,
             **SRP_VERIFY_PARAMS,
+            bytes_b=b
         )
 
     def set_srp_a(self, a):
