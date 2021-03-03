@@ -306,8 +306,8 @@ class HAPServerHandler:
         logger.debug("%s: Pairing [2/5]", self.client_address)
         A = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         M = tlv_objects[HAP_TLV_TAGS.PASSWORD_PROOF]
-        verifier = self.accessory_handler.srp_verifier
         self.accessory_handler.set_srp_a(A)
+        verifier = self.accessory_handler.srp_verifier
         hamk = verifier.verify_session(M)
 
         if hamk is None:  # Probably the provided pincode was wrong.
