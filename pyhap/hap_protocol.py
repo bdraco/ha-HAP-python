@@ -136,7 +136,7 @@ class HAPServerProtocol(asyncio.Protocol):
         """Process new data from the socket."""
         self.last_activity = time.time()
         if self.hap_crypto:
-            logger.debug(                "%s: Crypto data: %s", self.peername, data)            
+            logger.debug("%s: Crypto data: %s", self.peername, data)
             self.hap_crypto.receive_data(data)
             try:
                 unencrypted_data = self.hap_crypto.decrypt()

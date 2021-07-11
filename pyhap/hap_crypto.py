@@ -103,7 +103,9 @@ class HAPCrypto:
             # Now trim out the decrypted data
             del self._crypt_in_buffer[:data_size]
 
-        logger.debug("finished decrypt with %s in the buffer", len(self._crypt_in_buffer))
+        logger.debug(
+            "finished decrypt with %s in the buffer", len(self._crypt_in_buffer)
+        )
 
         return result
 
