@@ -67,7 +67,7 @@ class HAPServerProtocol(asyncio.Protocol):
         # Ensure we do not write a partial encrypted response
         # as it can cause the controller to send a RST and drop
         # the connection with large responses.
-        transport.set_write_buffer_limits(high=HIGH_WRITE_BUFFER_SIZE)
+        #transport.set_write_buffer_limits(high=HIGH_WRITE_BUFFER_SIZE)
         self.transport = transport
         self.peername = peername
         self.connections[peername] = self
