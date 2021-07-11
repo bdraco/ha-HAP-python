@@ -292,6 +292,8 @@ class Characteristic:
                 hap_rep[HAP_REPR_MAX_LEN] = min(len(value), 256)
         if HAP_PERMISSION_READ in self.properties[PROP_PERMISSIONS]:
             hap_rep[HAP_REPR_VALUE] = value
+        else:
+            hap_rep[HAP_REPR_VALUE] = None
 
         return hap_rep
 
