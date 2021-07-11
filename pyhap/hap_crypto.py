@@ -122,6 +122,7 @@ class HAPCrypto:
             ciphertext = length_bytes + self._out_cipher.encrypt(
                 nonce, block, length_bytes
             )
+            logger.debug("Encrypted in=%s out=%s", block, ciphertext)
             offset += length
             self._out_count += 1
             result += ciphertext
