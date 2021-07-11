@@ -260,8 +260,10 @@ class AccessoryDriver:
         """
         try:
             logger.info("Starting the event loop")
-            if threading.current_thread() is threading.main_thread() \
-                    and os.name != "nt":
+            if (
+                threading.current_thread() is threading.main_thread()
+                and os.name != "nt"
+            ):
                 logger.debug("Setting child watcher")
                 watcher = asyncio.SafeChildWatcher()
                 watcher.attach_loop(self.loop)
@@ -763,9 +765,14 @@ class AccessoryDriver:
 
             if HAP_PERMISSION_NOTIFY in cq:
                 char_topic = get_topic(aid, iid)
-                logger.debug(
-                    "Subscribed client %s to topic %s", client_addr, char_topic
-                )
+                if cq[HAP_PERMISSION_NOTIFY]:
+                    logger.debug(
+                        "Subscribed client %s to topic %s", client_addr, char_topic
+                    )
+                else:
+                    logger.debug(
+                        "Unsubscribed client %s to topic %s", client_addr, char_topic
+                    )
                 self.async_subscribe_client_topic(
                     client_addr, char_topic, cq[HAP_PERMISSION_NOTIFY]
                 )
