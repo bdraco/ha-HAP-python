@@ -113,7 +113,8 @@ class HAPServerProtocol(asyncio.Protocol):
             + self.conn.send(h11.Data(data=response.body))
             + self.conn.send(h11.EndOfMessage())
         )
-        self.transport.resume_reading()
+        # Process any pending events
+        self._process_events()
 
     def finish_and_close(self):
         """Cleanly finish and close the connection."""
@@ -157,6 +158,11 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def _process_events(self):
         """Process pending events."""
+        if self.conn.states[h11.SERVER] == h11.SEND_BODY:
+            # We will send events after the end of the body
+            logger.debug("%s: Deferring events until body written", self.peername)
+            return
+
         try:
             while self._process_one_event():
                 if self.conn.our_state is h11.MUST_CLOSE:
@@ -194,7 +200,6 @@ class HAPServerProtocol(asyncio.Protocol):
             return True
 
         if isinstance(event, h11.EndOfMessage):
-            self.transport.pause_reading()
             response = self.handler.dispatch(self.request, bytes(self.request_body))
             self._process_response(response)
             self.request = None
