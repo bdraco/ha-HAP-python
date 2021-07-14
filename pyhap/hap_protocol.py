@@ -162,6 +162,12 @@ class HAPServerProtocol(asyncio.Protocol):
             # We will send events after the end of the body
             logger.debug("%s: Deferring events until body written", self.peername)
             return
+        else:
+            logger.debug(
+                "%s: _process_events state=%s",
+                self.peername,
+                self.conn.states[h11.SERVER],
+            )
 
         try:
             while self._process_one_event():
