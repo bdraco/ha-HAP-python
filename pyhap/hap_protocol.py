@@ -42,6 +42,7 @@ class HAPServerProtocol(asyncio.Protocol):
 
         self.last_activity = None
         self.hap_crypto = None
+        self._event_timer = None
         self._event_queue = []
 
     def connection_lost(self, exc: Exception) -> None:
@@ -95,9 +96,9 @@ class HAPServerProtocol(asyncio.Protocol):
         self._event_queue.append(data)
         logger.warning("Appending %s to event queue: %s", data, self._event_queue)
         if immediate:
-            self.loop.call_soon(self._send_events)        
-        else:
-            self.loop.call_later(0.5, self._send_events)
+            self.loop.call_soon(self._send_events)
+        elif not self._event_timer:
+            self._event_timer = self.loop.call_later(0.5, self._send_events)
 
     def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""
@@ -171,6 +172,9 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def _send_events(self):
         """Send any pending events."""
+        if self._event_timer:
+            self._event_timer.cancel()
+            self._event_timer = None
         if not self._event_queue:
             return
         self.write(create_hap_event(self._event_queue))
