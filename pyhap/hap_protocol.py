@@ -98,7 +98,7 @@ class HAPServerProtocol(asyncio.Protocol):
         if immediate:
             self.loop.call_soon(self._send_events)
         elif not self._event_timer:
-            self._event_timer = self.loop.call_later(0.75, self._send_events)
+            self._event_timer = self.loop.call_later(0.5, self._send_events)
 
     def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""

@@ -232,8 +232,9 @@ class Characteristic:
         """
         logger.debug("set_value: %s to %s", self.display_name, value)
         value = self.to_valid_value(value)
+        changed = self.value == value
         self.value = value
-        if should_notify and self.broker:
+        if changed and should_notify and self.broker:
             self.notify()
 
     def client_update_value(self, value, sender_client_addr=None):
