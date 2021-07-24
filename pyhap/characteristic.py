@@ -232,7 +232,7 @@ class Characteristic:
         """
         logger.debug("set_value: %s to %s", self.display_name, value)
         value = self.to_valid_value(value)
-        changed = self.value == value
+        changed = self.value != value
         self.value = value
         if changed and should_notify and self.broker:
             self.notify()
