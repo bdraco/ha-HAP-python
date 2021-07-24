@@ -1,6 +1,6 @@
 """Tests for pyhap.characteristic."""
-from unittest.mock import ANY, Mock, patch
-from uuid import uuid1
+from unittest.mock import ANY, MagicMock, Mock, patch
+from uuid import uuid1, UUID
 
 import pytest
 
@@ -8,6 +8,7 @@ from pyhap.characteristic import (
     HAP_FORMAT_DEFAULTS,
     HAP_FORMAT_INT,
     HAP_PERMISSION_READ,
+    CHAR_PROGRAMMABLE_SWITCH_EVENT,
     Characteristic,
 )
 
@@ -127,6 +128,42 @@ def test_set_value():
         char.set_value(3)
         assert char.value == 3
         assert mock_notify.call_count == 1
+
+
+def test_set_value_immediate():
+    """Test setting the value of a characteristic generates immediate notify."""
+    char = Characteristic(
+        display_name="Switch Event",
+        type_id=CHAR_PROGRAMMABLE_SWITCH_EVENT,
+        properties=PROPERTIES.copy(),
+    )
+    assert char.value is None
+
+    publish_mock = Mock()
+    char.broker = Mock(publish=publish_mock)
+
+    char.set_value(0)
+    assert char.value is None
+    publish_mock.assert_called_with(0, char, None, True)
+
+    char.set_value(1)
+    assert char.value is None
+    publish_mock.assert_called_with(1, char, None, True)
+
+
+def test_switch_event_always_serializes_to_null():
+    """Test that the switch event char is always null."""
+    char = Characteristic(
+        display_name="Switch Event",
+        type_id=CHAR_PROGRAMMABLE_SWITCH_EVENT,
+        properties=PROPERTIES.copy(),
+    )
+    assert char.value is None
+    char.broker = MagicMock()
+
+    assert char.to_HAP()["value"] is None
+    char.set_value(1)
+    assert char.to_HAP()["value"] is None
 
 
 def test_client_update_value():
