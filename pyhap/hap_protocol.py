@@ -23,6 +23,8 @@ HIGH_WRITE_BUFFER_SIZE = 2 ** 19
 # reopen homekit.
 IDLE_CONNECTION_TIMEOUT_SECONDS = 90 * 60 * 60
 
+EVENT_COALESCE_TIME_WINDOW = 0.5
+
 
 class HAPServerProtocol(asyncio.Protocol):
     """A asyncio.Protocol implementing the HAP protocol."""
@@ -93,12 +95,14 @@ class HAPServerProtocol(asyncio.Protocol):
 
     def queue_event(self, data: dict, immediate: bool) -> None:
         """Queue an event for sending."""
+        logger.debug("Appending %s to event queue: %s", data, self._event_queue)
         self._event_queue.append(data)
-        logger.warning("Appending %s to event queue: %s", data, self._event_queue)
         if immediate:
             self.loop.call_soon(self._send_events)
         elif not self._event_timer:
-            self._event_timer = self.loop.call_later(0.5, self._send_events)
+            self._event_timer = self.loop.call_later(
+                EVENT_COALESCE_TIME_WINDOW, self._send_events
+            )
 
     def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""
