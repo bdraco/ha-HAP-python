@@ -93,7 +93,7 @@ class HAPServerProtocol(asyncio.Protocol):
     def queue_event(self, data: dict) -> None:
         """Queue an event for sending."""
         self._event_queue.append(data)
-        self.loop.call_soon(self._process_events)
+        self.loop.call_later(0.2, self._process_events)
 
     def send_response(self, response: HAPResponse) -> None:
         """Send a HAPResponse object."""
