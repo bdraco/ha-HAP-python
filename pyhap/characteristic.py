@@ -6,6 +6,9 @@ a temperature measuring or a device status.
 """
 import logging
 
+from uuid import UUID
+
+
 from pyhap.const import (
     HAP_PERMISSION_READ,
     HAP_REPR_DESC,
@@ -77,6 +80,11 @@ PROP_UNIT = "unit"
 PROP_VALID_VALUES = "ValidValues"
 
 PROP_NUMERIC = (PROP_MAX_VALUE, PROP_MIN_VALUE, PROP_MIN_STEP, PROP_UNIT)
+
+IMMEDIATE_NOTIFY = {
+    UUID("00000126-0000-1000-8000-0026BB765291"), # Button Event
+    UUID("00000073-0000-1000-8000-0026BB765291") # Programmable Switch Event
+}
 
 
 class CharacteristicError(Exception):
@@ -251,7 +259,8 @@ class Characteristic:
         .. seealso:: accessory.publish
         .. seealso:: accessory_driver.publish
         """
-        self.broker.publish(self.value, self, sender_client_addr)
+        immediate = self.type_id in IMMEDIATE_NOTIFY
+        self.broker.publish(self.value, self, sender_client_addr, immediate)
 
     # pylint: disable=invalid-name
     def to_HAP(self):
