@@ -153,6 +153,7 @@ class HAPServerProtocol(asyncio.Protocol):
         else:
             self.conn.receive_data(data)
             logger.debug("%s: Recv unencrypted: %s", self.peername, data)
+        self._process_events()
 
     def _process_events(self):
         """Process pending events."""
