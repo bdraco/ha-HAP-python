@@ -123,6 +123,11 @@ def test_set_value():
         assert char.value == 3
         assert mock_notify.call_count == 1
 
+        # No change should not generate another notify
+        char.set_value(3)
+        assert char.value == 3
+        assert mock_notify.call_count == 1
+
 
 def test_client_update_value():
     """Test updating the characteristic value with call from the driver."""
@@ -143,6 +148,17 @@ def test_client_update_value():
         char.client_update_value(9, "mock_client_addr")
         assert char.value == 9
         mock_notify.assert_called_once_with("mock_client_addr")
+        mock_notify.called_count == 1
+
+        # Same value, do not call again
+        char.client_update_value(9, "mock_client_addr")
+        assert char.value == 9
+        mock_notify.called_count == 1
+
+        # New value, should notify
+        char.client_update_value(12, "mock_client_addr")
+        assert char.value == 12
+        mock_notify.called_count == 2
 
 
 def test_notify():
@@ -155,11 +171,11 @@ def test_notify():
 
     with patch.object(char, "broker") as mock_broker:
         char.notify()
-    mock_broker.publish.assert_called_with(2, char, None)
+    mock_broker.publish.assert_called_with(2, char, None, False)
 
     with patch.object(char, "broker") as mock_broker:
         char.notify("mock_client_addr")
-    mock_broker.publish.assert_called_with(2, char, "mock_client_addr")
+    mock_broker.publish.assert_called_with(2, char, "mock_client_addr", False)
 
 
 def test_to_HAP_numberic():
