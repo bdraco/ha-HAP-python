@@ -232,9 +232,8 @@ class Characteristic:
         """
         logger.debug("set_value: %s to %s", self.display_name, value)
         value = self.to_valid_value(value)
-        changed = self.value != value
         self.value = value
-        if changed and should_notify and self.broker:
+        if should_notify and self.broker:
             self.notify()
 
     def client_update_value(self, value, sender_client_addr=None):
@@ -248,8 +247,10 @@ class Characteristic:
             value,
             sender_client_addr,
         )
+        changed = self.value != value
         self.value = value
-        self.notify(sender_client_addr)
+        if changed:
+            self.notify(sender_client_addr)
         if self.setter_callback:
             # pylint: disable=not-callable
             self.setter_callback(value)
