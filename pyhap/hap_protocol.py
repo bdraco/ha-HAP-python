@@ -88,6 +88,7 @@ class HAPServerProtocol(asyncio.Protocol):
         """Remove the connection and close the transport."""
         if self.peername in self.connections:
             del self.connections[self.peername]
+        self.transport.write_eof()
         self.transport.close()
 
     def queue_event(self, data: dict) -> None:
@@ -118,6 +119,7 @@ class HAPServerProtocol(asyncio.Protocol):
     def finish_and_close(self):
         """Cleanly finish and close the connection."""
         self.conn.send(h11.ConnectionClosed())
+        self.transport.write_eof()
         self.close()
 
     def check_idle(self, now) -> None:
@@ -131,6 +133,14 @@ class HAPServerProtocol(asyncio.Protocol):
             self.accessory_driver.accessory.display_name,
         )
         self.close()
+
+    def eof_received(self):
+        """Log eof."""
+        logger.debug(
+            "%s: Recieved EOF for %s",
+            self.peername,
+            self.accessory_driver.accessory.display_name,
+        )
 
     def data_received(self, data: bytes) -> None:
         """Process new data from the socket."""
