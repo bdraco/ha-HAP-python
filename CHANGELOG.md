@@ -17,6 +17,9 @@ Sections
 -->
 ## [4.5.0] - 2022-06-23
 
+### Deprecated
+- Increase minimum python version to 3.7 [#7](https://github.com/bdraco/ha-HAP-python/pull/7)
+
 ### Added
 - orjson support [#2](https://github.com/bdraco/ha-HAP-python/pull/2)
 
