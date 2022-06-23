@@ -1,5 +1,7 @@
-[![PyPI version](https://badge.fury.io/py/HAP-python.svg)](https://badge.fury.io/py/HAP-python) [![Build Status](https://github.com/ikalchev/HAP-python/workflows/CI/badge.svg)](https://github.com/ikalchev/HAP-python) [![codecov](https://codecov.io/gh/ikalchev/HAP-python/branch/master/graph/badge.svg)](https://codecov.io/gh/ikalchev/HAP-python) [![Python Versions](https://img.shields.io/pypi/pyversions/HAP-python.svg)](https://pypi.python.org/pypi/HAP-python/) [![Documentation Status](https://readthedocs.org/projects/hap-python/badge/?version=latest)](http://hap-python.readthedocs.io/en/latest/?badge=latest) [![Downloads](https://pepy.tech/badge/hap-python)](https://pepy.tech/project/hap-python)
-# HAP-python
+[![PyPI version](https://badge.fury.io/py/ha-HAP-python.svg)](https://badge.fury.io/py/ha-HAP-python) [![Build Status](https://github.com/bdraco/ha-HAP-python/workflows/CI/badge.svg)](https://github.com/bdraco/ha-HAP-python) [![codecov](https://codecov.io/gh/bdraco/ha-HAP-python/branch/master/graph/badge.svg)](https://codecov.io/gh/bdraco/ha-HAP-python) [![Python Versions](https://img.shields.io/pypi/pyversions/ha-HAP-python.svg)](https://pypi.python.org/pypi/ha-HAP-python/) [![Documentation Status](https://readthedocs.org/projects/ha-hap-python/badge/?version=latest)](http://ha-hap-python.readthedocs.io/en/latest/?badge=latest) [![Downloads](https://pepy.tech/badge/ha-hap-python)](https://pepy.tech/project/ha-hap-python)
+# ha-HAP-python
+
+This is a fork of HAP-python which is used for providing hotfixes for or troubleshooting issues with HAP-python in Home Assistant.
 
 HomeKit Accessory Protocol implementation in python 3.
 With this project, you can integrate your own smart devices and add them to your
