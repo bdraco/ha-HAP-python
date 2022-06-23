@@ -15,6 +15,18 @@ Sections
 ### Breaking Changes
 ### Developers
 -->
+## [4.5.0] - 2022-06-23
+
+### Deprecated
+- Increase minimum python version to 3.7 [#7](https://github.com/bdraco/ha-HAP-python/pull/7)
+
+### Added
+- orjson support [#2](https://github.com/bdraco/ha-HAP-python/pull/2)
+
+### Fixed
+- Avoid parsing the url twice [#4](https://github.com/bdraco/ha-HAP-python/pull/4)
+- Switch to using ChaCha20Poly1305Reusable for encryption [#3](https://github.com/bdraco/ha-HAP-python/pull/3)
+
 ## [4.4.0] - 2022-11-01
 
 ### Added
