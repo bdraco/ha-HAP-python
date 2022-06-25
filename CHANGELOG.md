@@ -15,6 +15,11 @@ Sections
 ### Breaking Changes
 ### Developers
 -->
+## [4.5.1] - 2022-06-25
+
+### Added
+- Speed up get accessories [#9](https://github.com/bdraco/ha-HAP-python/pull/9)
+
 ## [4.5.0] - 2022-06-23
 
 ### Deprecated
