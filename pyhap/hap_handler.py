@@ -668,11 +668,16 @@ class HAPServerHandler:
 
     def _handle_add_pairing(self, tlv_objects):
         """Update client information."""
-        logger.debug("%s: Adding client pairing.", self.client_address)
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_public = tlv_objects[HAP_TLV_TAGS.PUBLIC_KEY]
         permissions = tlv_objects[HAP_TLV_TAGS.PERMISSIONS]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
+        logger.debug(
+            "%s: Adding client pairing for %s with permissions %s.",
+            self.client_address,
+            client_uuid,
+            permissions,
+        )
         should_confirm = self.accessory_handler.pair(
             client_uuid, client_public, permissions
         )
@@ -685,10 +690,15 @@ class HAPServerHandler:
 
     def _handle_remove_pairing(self, tlv_objects):
         """Remove pairing with the client."""
-        logger.debug("%s: Removing client pairing.", self.client_address)
         client_username = tlv_objects[HAP_TLV_TAGS.USERNAME]
         client_uuid = uuid.UUID(str(client_username, "utf-8"))
         was_paired = self.state.paired
+        logger.debug(
+            "%s: Removing client pairing %s (was previously paired=%s).",
+            self.client_address,
+            client_uuid,
+            was_paired,
+        )
         # If the client does not exist, we must
         # respond with success per the spec
         if client_uuid in self.state.paired_clients:
