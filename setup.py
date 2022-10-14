@@ -32,7 +32,7 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     url=URL,
-    packages=["pyhap"],
+    packages=["pyhap", "pyhap.resources", "pyhap.accessories"],
     include_package_data=True,
     project_urls=PROJECT_URLS,
     python_requires=">={}".format(MIN_PY_VERSION),

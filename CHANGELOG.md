@@ -17,6 +17,8 @@ Sections
 -->
 ## [4.5.2] - 2022-10-13
 
+- Fix pairing with iOS 16 [#11](https://github.com/bdraco/ha-HAP-python/pull/11)
+- Add support for a custom iid manager [#12](https://github.com/bdraco/ha-HAP-python/pull/12)
 
 ## [4.5.0] - 2022-06-28
 
