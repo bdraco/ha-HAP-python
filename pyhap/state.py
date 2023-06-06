@@ -1,10 +1,10 @@
 """Module for `State` class."""
 from typing import Dict
 from uuid import UUID
+from typing import List, Optional, Union
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from typing import List, Optional, Union
 from pyhap import util
 from pyhap.const import (
     CLIENT_PROP_PERMS,
