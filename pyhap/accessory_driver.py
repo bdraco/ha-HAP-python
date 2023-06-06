@@ -26,10 +26,7 @@ import sys
 import tempfile
 import threading
 import time
-<<<<<<< HEAD
-=======
 from typing import Optional
->>>>>>> mdns_ips
 
 from zeroconf import ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
