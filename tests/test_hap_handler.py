@@ -545,6 +545,8 @@ def test_pair_verify_two_success(driver: AccessoryDriver):
     }
     assert handler.is_encrypted is True
     assert handler.client_uuid == CLIENT_UUID
+    # Verify we saved the raw bytes of the username
+    assert driver.state.uuid_to_bytes[CLIENT_UUID] == CLIENT_UUID_BYTES
 
 
 def test_invalid_pairing_request(driver: AccessoryDriver):
